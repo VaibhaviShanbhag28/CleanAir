@@ -49,35 +49,35 @@ export default function HomePage() {
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary font-medium">
                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                Live monitoring across Bengaluru
+                Real time air quality monitoring of Bengaluru
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-                Breathe Better,{' '}
-                <span className="text-primary">Report Faster</span>
+                Clean Air Starts{' '}
+                <span className="text-primary">With You</span>
               </h1>
 
               <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
-                Spot garbage fires, industrial smoke, and dust hotspots. Upload a photo — our AI analyses it instantly and alerts authorities.
+                See smoke, dust, or garbage burning near you? Snap a photo and report it in seconds. Our AI identifies the problem instantly and notifies the right authorities . So your city gets cleaner, faster.
               </p>
 
               <div className="flex flex-wrap gap-3">
                 <Button size="lg" asChild>
                   <Link to="/report">
                     <Camera className="h-5 w-5" />
-                    {t('report_pollution')}
+                    Report Pollution Now
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
                   <Link to="/map">
                     <MapPin className="h-5 w-5" />
-                    {t('view_map')}
+                    View Live Heatmap
                   </Link>
                 </Button>
                 <Button size="sm" variant="ghost" asChild>
                   <Link to="/report?anonymous=true">
-                    {t('anonymous_report')}
+                    🕵️ Report Anonymously (no account needed)
                   </Link>
                 </Button>
               </div>
@@ -86,15 +86,15 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground pt-2">
                 <span className="flex items-center gap-1.5">
                   <Shield className="h-4 w-4 text-primary" />
-                  BBMP Integrated
+                  BBMP & KSPCB Integrated
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Zap className="h-4 w-4 text-primary" />
-                  AI-powered analysis
+                  Gemini AI Analysis
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Globe2 className="h-4 w-4 text-primary" />
-                  3 languages
+                  English
                 </span>
               </div>
             </div>
@@ -106,7 +106,7 @@ export default function HomePage() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Current AQI</p>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Live Air Quality Index</p>
                         <p className="text-sm font-semibold">Bengaluru, Karnataka</p>
                       </div>
                       <div className="text-right">
@@ -137,12 +137,12 @@ export default function HomePage() {
                     </div>
 
                     <div className="mt-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                      ⚠️ Air quality is unhealthy. Sensitive groups should avoid outdoor activity.
+                      ⚠️ Air quality is unhealthy. Children, elderly, and those with asthma should stay indoors.
                     </div>
 
                     {/* Recent hotspot count */}
                     <div className="mt-3 flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Active reports today</span>
+                      <span className="text-muted-foreground">🔴 Active pollution reports today</span>
                       <span className="font-bold text-destructive">
                         {DEMO_REPORTS.filter(r => r.status === 'pending').length} hotspots
                       </span>
@@ -164,10 +164,10 @@ export default function HomePage() {
             }`}
           >
             {[
-              { label: 'Reports Filed', value: DEMO_ANALYTICS.totalReports.toLocaleString(), icon: Camera, color: 'text-blue-600' },
-              { label: 'Resolved', value: DEMO_ANALYTICS.resolvedReports.toLocaleString(), icon: Shield, color: 'text-green-600' },
-              { label: 'People Affected', value: `${(DEMO_ANALYTICS.estimatedPeopleAffected / 1000).toFixed(0)}K`, icon: Users, color: 'text-orange-600' },
-              { label: 'Avg. Response', value: `${DEMO_ANALYTICS.avgResponseTimeHours}h`, icon: TrendingUp, color: 'text-purple-600' },
+              { label: 'Pollution Reports Filed', value: DEMO_ANALYTICS.totalReports.toLocaleString(), icon: Camera, color: 'text-blue-600' },
+              { label: 'Issues Resolved', value: DEMO_ANALYTICS.resolvedReports.toLocaleString(), icon: Shield, color: 'text-green-600' },
+              { label: 'Citizens Protected', value: `${(DEMO_ANALYTICS.estimatedPeopleAffected / 1000).toFixed(0)}K+`, icon: Users, color: 'text-orange-600' },
+              { label: 'Avg. Authority Response', value: `${DEMO_ANALYTICS.avgResponseTimeHours}h`, icon: TrendingUp, color: 'text-purple-600' },
             ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} className="text-center">
                 <div className={`text-3xl font-bold font-mono mb-1 ${color}`}>{value}</div>
@@ -187,7 +187,8 @@ export default function HomePage() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-3">How CleanAir Works</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              From spotting a problem to getting it fixed — in 3 simple steps.
+              Anyone can make Bengaluru cleaner. 
+              Here's how it works in 3 simple steps!! No technical knowledge needed.
             </p>
           </div>
 
@@ -197,23 +198,23 @@ export default function HomePage() {
                 step: '01',
                 icon: Camera,
                 title: 'Spot & Report',
-                description: 'See pollution? Take a photo or record a voice note. Your GPS location is captured automatically.',
+                description: 'See smoke, dust, or garbage? Take a photo or record a voice note. Your GPS location is captured automatically.',
                 color: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800',
                 iconColor: 'text-blue-600',
               },
               {
                 step: '02',
                 icon: Zap,
-                title: 'AI Analyses It',
-                description: 'Gemini Vision identifies the pollution type, estimates severity, and generates a health advisory in seconds.',
+                title: 'AI Analyses It Instantly',
+                description: 'Google\'s Gemini AI scans your photo in seconds and identifies pollution type, severity, and health risk. No guesswork, just facts.',
                 color: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800',
                 iconColor: 'text-purple-600',
               },
               {
                 step: '03',
                 icon: Shield,
-                title: 'Authorities Act',
-                description: 'BBMP and KSPCB teams get instant alerts. They can assign teams, track resolution, and close reports.',
+                title: 'Authorities Take Action',
+                description: 'BBMP and KSPCB teams get an instant alert with your report. They assign a response team, track progress, and mark it resolved. You can follow along live.',
                 color: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
                 iconColor: 'text-green-600',
               },
@@ -244,7 +245,7 @@ export default function HomePage() {
               { icon: '📊', title: '24h AQI Forecast', desc: 'ML-powered predictions using weather and historical data' },
               { icon: '🔔', title: 'Authority Alerts', desc: 'Instant email and SMS notifications to municipal bodies' },
               { icon: '🎙️', title: 'Voice Reporting', desc: 'Report pollution hands-free using speech-to-text' },
-              { icon: '🌐', title: 'Multilingual', desc: 'Available in English, Hindi, and Kannada' },
+              { icon: '🌐', title: 'Multilingual', desc: 'Available in English, Hindi, and Kannada in future' },
               { icon: '♿', title: 'Accessible', desc: 'WCAG 2.1 AA compliant with keyboard navigation' },
               { icon: '📱', title: 'Works Offline', desc: 'Save drafts offline and sync when connected' },
             ].map(({ icon, title, desc }) => (
@@ -291,18 +292,19 @@ export default function HomePage() {
       <section className="py-20 px-4 sm:px-6 bg-primary text-primary-foreground">
         <div className="mx-auto max-w-3xl text-center">
           <Wind className="h-12 w-12 mx-auto mb-4 opacity-80" />
-          <h2 className="text-3xl font-bold mb-4">Your city, your air</h2>
+          <h2 className="text-3xl font-bold mb-4">Your City, Your Air</h2>
           <p className="text-primary-foreground/80 mb-8 text-lg">
-            Every report makes Bengaluru cleaner. Join thousands of citizens already making a difference.
+            Every Report you file brings Bengaluru one step closer to cleaner streets. 
+            It takes 30 seconds and it matters. Join thousands of citizens already making a difference.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Button size="xl" variant="secondary" asChild>
-              <Link to="/signup">Join CleanAir</Link>
+              <Link to="/signup">Create Free Account</Link>
             </Button>
             <Button size="xl" variant="ghost" className="text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/10" asChild>
               <Link to="/report?anonymous=true">
                 <Mic className="h-5 w-5" />
-                Quick Report
+                Report Without Signing Up
               </Link>
             </Button>
           </div>
@@ -315,7 +317,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Wind className="h-4 w-4 text-primary" />
             <span className="font-semibold text-foreground">CleanAir</span>
-            <span>— Built for Hack2Skill 2024</span>
+            <span>Making Bengaluru breathe easier, One report at a time.</span>
           </div>
           <div className="flex gap-6">
             <Link to="/map" className="hover:text-foreground transition-colors">Map</Link>
