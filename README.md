@@ -261,3 +261,12 @@ Built for **Hack2Skill CleanAir & Clear Streets Challenge**
 ## 📄 License
 
 MIT License — see [LICENSE](LICENSE)
+
+
+Free APIs We'll Use : 
+Firebase ==> Spark plan (free forever) ==> Auth + Database
+Gemini API ==> 15 req/min free ==> AI image analysis   ==> Done
+OpenWeatherMap ==> 1000 calls/day free ==> Live weather + AQI
+Google Maps ==> $200/month credi ==> tHeatmap + geocoding
+Cloudinary ==> 25GB free ==> Image storage
+
