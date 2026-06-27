@@ -1,0 +1,30 @@
+# Environment files - NEVER commit these
+.env
+.env.local
+.env.production
+.env*.local
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Build output
+dist/
+build/
+.vite/
+
+# Python virtual env
+venv/
+.venv/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
