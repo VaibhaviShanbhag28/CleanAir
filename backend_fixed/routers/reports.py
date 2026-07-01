@@ -1,5 +1,6 @@
 """
-Reports router — CRUD + heatmap + upvote
+backend/routers/reports.py
+Reports router — CRUD + heatmap + upvote + fake-report detection
 """
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
@@ -29,10 +30,33 @@ async def list_reports(
 @router.post("", status_code=201)
 async def create_report(data: ReportCreate):
     report_dict = data.model_dump()
+
+    # ── Fake-report gate: block before touching Firestore ─────────────────────
+    validation = report_dict.get("validation") or {}
+    if validation.get("should_block"):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "blocked":          True,
+                "reason":           validation.get("reason", "Image not valid."),
+                "detected_content": validation.get("detected_content", ""),
+                "confidence":       validation.get("confidence", 0),
+            },
+        )
+    # ─────────────────────────────────────────────────────────────────────────
+
     report = await database.create_report(report_dict)
-    # Notify authorities for high severity reports
     await database.notify_authorities(report)
     return report
+
+
+@router.get("/flagged")
+async def get_flagged_reports(limit: int = Query(50, le=200)):
+    """
+    Reports where validation.review_flag == True.
+    Used by MunicipalPage 'Needs Review' tab.
+    """
+    return await database.get_flagged_reports(limit=limit)
 
 
 @router.get("/heatmap")

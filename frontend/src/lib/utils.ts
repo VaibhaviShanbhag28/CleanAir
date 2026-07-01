@@ -1,168 +1,96 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-import type { AQICategory, AQIData, PollutionType, SeverityLevel } from '@/types'
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
-// ─── AQI Helpers ──────────────────────────────────────────────────────────────
-export function getAQICategory(value: number): AQICategory {
-  if (value <= 50) return 'Good'
-  if (value <= 100) return 'Moderate'
-  if (value <= 150) return 'Sensitive'
-  if (value <= 200) return 'Unhealthy'
-  if (value <= 300) return 'Very Unhealthy'
-  return 'Hazardous'
+export function getAQIColor(aqi: number): string {
+  if (aqi <= 50) return '#00C853';
+  if (aqi <= 100) return '#FFD600';
+  if (aqi <= 150) return '#FF9100';
+  if (aqi <= 200) return '#FF3D00';
+  if (aqi <= 300) return '#7B1FA2';
+  return '#4E0000';
 }
 
-export function getAQIColor(value: number): string {
-  if (value <= 50) return '#00C853'
-  if (value <= 100) return '#FFD600'
-  if (value <= 150) return '#FF9100'
-  if (value <= 200) return '#FF3D00'
-  if (value <= 300) return '#7B1FA2'
-  return '#4E0000'
+export function getAQILabel(aqi: number): string {
+  if (aqi <= 50) return 'Good';
+  if (aqi <= 100) return 'Moderate';
+  if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
+  if (aqi <= 200) return 'Unhealthy';
+  if (aqi <= 300) return 'Very Unhealthy';
+  return 'Hazardous';
 }
 
-export function getAQIData(value: number): AQIData {
-  return {
-    value,
-    category: getAQICategory(value),
-    color: getAQIColor(value),
-  }
+export function getSeverityColor(severity: string): string {
+  if (severity === 'high') return 'text-red-500 bg-red-50';
+  if (severity === 'medium') return 'text-orange-500 bg-orange-50';
+  return 'text-green-600 bg-green-50';
 }
 
-// ─── Pollution Type Helpers ────────────────────────────────────────────────────
-export const POLLUTION_LABELS: Record<PollutionType, string> = {
-  garbage_fire: 'Garbage Fire',
-  smoke: 'Smoke / Haze',
-  construction_dust: 'Construction Dust',
-  industrial: 'Industrial Pollution',
-  vehicle: 'Vehicle Emission',
-  burning_waste: 'Burning Waste',
-  unknown: 'Unknown',
+export function getStatusColor(status: string): string {
+  if (status === 'resolved') return 'text-green-600 bg-green-50 border-green-200';
+  if (status === 'in_progress') return 'text-blue-600 bg-blue-50 border-blue-200';
+  if (status === 'acknowledged') return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+  if (status === 'flagged') return 'text-purple-600 bg-purple-50 border-purple-200';
+  return 'text-gray-600 bg-gray-50 border-gray-200';
 }
 
-export const POLLUTION_ICONS: Record<PollutionType, string> = {
-  garbage_fire: '🔥',
-  smoke: '💨',
-  construction_dust: '🏗️',
-  industrial: '🏭',
-  vehicle: '🚗',
-  burning_waste: '♻️',
-  unknown: '❓',
+export function getPollutionIcon(type: string): string {
+  const icons: Record<string, string> = {
+    garbage_fire: '🔥', smoke: '💨', construction_dust: '🏗️',
+    industrial: '🏭', vehicle: '🚗', burning_waste: '♻️',
+    water_pollution: '💧', noise_pollution: '🔊', chemical_dumping: '⚗️',
+    illegal_dumping: '🗑️', tree_cutting: '🌳', sewage_leakage: '🚧',
+    unknown: '⚠️',
+  };
+  return icons[type] || '⚠️';
 }
 
-export const POLLUTION_COLORS: Record<PollutionType, string> = {
-  garbage_fire: '#FF3D00',
-  smoke: '#607D8B',
-  construction_dust: '#FF9100',
-  industrial: '#7B1FA2',
-  vehicle: '#1565C0',
-  burning_waste: '#BF360C',
-  unknown: '#757575',
+export function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-// ─── Severity Helpers ──────────────────────────────────────────────────────────
-export const SEVERITY_LABELS: Record<SeverityLevel, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-}
-
-export const SEVERITY_WEIGHTS: Record<SeverityLevel, number> = {
-  low: 0.3,
-  medium: 0.6,
-  high: 1.0,
-}
-
-// ─── Date Helpers ──────────────────────────────────────────────────────────────
-export function formatRelativeTime(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString('en-IN')
-}
-
-export function formatDateTime(date: Date): string {
-  return date.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-// ─── Location Helpers ──────────────────────────────────────────────────────────
-export function getCurrentLocation(): Promise<GeolocationPosition> {
+export function imageToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation not supported'))
-      return
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    })
-  })
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
-export async function reverseGeocode(
-  lat: number,
-  lng: number,
-  apiKey: string
-): Promise<{ address: string; ward: string; district: string }> {
-  try {
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`
-    )
-    const data = await res.json()
-    if (data.results?.[0]) {
-      const result = data.results[0]
-      const components = result.address_components || []
+export const BENGALURU_WARDS = [
+  'Koramangala', 'Indiranagar', 'Whitefield', 'Hebbal',
+  'Jayanagar', 'Banashankari', 'HSR Layout', 'Marathahalli',
+  'Electronic City', 'Yelahanka', 'BTM Layout', 'JP Nagar',
+  'Rajajinagar', 'Malleshwaram', 'Basavanagudi', 'Shivajinagar',
+  'MG Road', 'Vijayanagar', 'RT Nagar', 'Ulsoor',
+];
 
-      const getComponent = (type: string) =>
-        components.find((c: { types: string[]; long_name: string }) => c.types.includes(type))?.long_name || ''
-
-      return {
-        address: result.formatted_address,
-        ward: getComponent('sublocality_level_1') || getComponent('sublocality'),
-        district: getComponent('administrative_area_level_2') || getComponent('locality'),
-      }
-    }
-  } catch (e) {
-    console.error('Geocoding error', e)
-  }
-  return { address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, ward: 'Unknown', district: 'Unknown' }
-}
-
-// ─── File Helpers ──────────────────────────────────────────────────────────────
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-// ─── Mock data generators ──────────────────────────────────────────────────────
-export function generateId(): string {
-  return Math.random().toString(36).slice(2, 11)
-}
+export const POLLUTION_TYPES = [
+  { value: 'garbage_fire', label: 'Garbage Fire', icon: '🔥' },
+  { value: 'smoke', label: 'Smoke / Haze', icon: '💨' },
+  { value: 'construction_dust', label: 'Construction Dust', icon: '🏗️' },
+  { value: 'industrial', label: 'Industrial Emission', icon: '🏭' },
+  { value: 'vehicle', label: 'Vehicle Emission', icon: '🚗' },
+  { value: 'burning_waste', label: 'Burning Waste', icon: '♻️' },
+  { value: 'water_pollution', label: 'Water Pollution', icon: '💧' },
+  { value: 'illegal_dumping', label: 'Illegal Dumping', icon: '🗑️' },
+  { value: 'sewage_leakage', label: 'Sewage Leakage', icon: '🚧' },
+  { value: 'tree_cutting', label: 'Tree Cutting', icon: '🌳' },
+  { value: 'noise_pollution', label: 'Noise Pollution', icon: '🔊' },
+  { value: 'chemical_dumping', label: 'Chemical Dumping', icon: '⚗️' },
+  { value: 'unknown', label: 'Other', icon: '⚠️' },
+];

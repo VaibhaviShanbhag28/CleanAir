@@ -44,3 +44,19 @@ async def verify_token(req: TokenVerifyRequest):
             "email": "demo@cleanair.in",
             "access_token": "demo-token",
         }
+
+
+@analytics_router.get("/ai-insights")
+async def analytics_ai_insights():
+    """GET endpoint for AI-powered analytics insights (called by frontend dashboard)."""
+    from services import ai_service
+    overview = await database.get_analytics_overview()
+    result = await ai_service.generate_dashboard_insights(overview)
+    return result
+
+
+@analytics_router.get("/wards/ranking")
+async def wards_ranking():
+    """Return wards ranked by report count."""
+    overview = await database.get_analytics_overview()
+    return overview.get("wardRankings", [])
