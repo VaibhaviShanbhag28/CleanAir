@@ -51,7 +51,7 @@ A citizen claims this photo shows: {pollution_type}.
 Their description: "{description}"
 
 Analyse ONLY what is visible in the image.
-Reply with ONLY valid JSON — no markdown fences, no text outside the braces.
+Reply with ONLY valid JSON - no markdown fences, no text outside the braces.
 
 Check these fraud signals:
 1. Is outdoor pollution visible? (smoke, dust, garbage fire, construction dust, industrial emissions, burning waste)
@@ -70,7 +70,7 @@ Return exactly this JSON:
   "is_screenshot": true_or_false,
   "is_irrelevant_scene": true_or_false,
   "recommended_action": "accept" or "review" or "reject",
-  "user_facing_reason": "one friendly sentence — only fill if rejecting"
+  "user_facing_reason": "one friendly sentence - only fill if rejecting"
 }}"""
 
 
@@ -80,7 +80,7 @@ async def validate_image_base64(
     pollution_type: str,
     description:    str,
     has_gps:        bool,
-    api_key:        str,          # kept for backward compat — we use _get_key() internally
+    api_key:        str,          # kept for backward compat - we use _get_key() internally
 ) -> ValidationResult:
     """
     Called from ai_router.py. Never blocks if AI fails.

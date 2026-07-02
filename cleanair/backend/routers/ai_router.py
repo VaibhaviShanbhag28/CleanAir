@@ -1,6 +1,6 @@
 """
 backend/routers/ai_router.py
-All AI endpoints — Gemini Vision, chatbot, horoscope, tools, etc.
+All AI endpoints - Gemini Vision, chatbot, horoscope, tools, etc.
 """
 import asyncio
 from fastapi import APIRouter, HTTPException
@@ -14,7 +14,7 @@ from config import settings
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-# ─── Request models ──────────────────────────────────────────────────────────
+# --- Request models ----------------------------------------------------------
 
 class AnalyzeRequest(BaseModel):
     image:          str
@@ -65,7 +65,7 @@ class DiarySummaryRequest(BaseModel):
     entries: list
 
 
-# ─── Endpoints ───────────────────────────────────────────────────────────────
+# --- Endpoints ---------------------------------------------------------------
 
 @router.post("/analyze")
 async def analyze_image(body: AnalyzeRequest):

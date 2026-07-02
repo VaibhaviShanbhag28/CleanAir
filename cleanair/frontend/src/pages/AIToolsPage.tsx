@@ -1,57 +1,276 @@
 import React, { useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { useAppStore } from '@/store';
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Select, Textarea, Badge, Spinner, toast } from '@/components/ui';
+import { Modal, toast } from '@/components/ui';
 import { imageToBase64 } from '@/lib/utils';
-import { cn } from '@/lib/utils';
 import { useSearchParams } from 'react-router-dom';
 
-type Tool = 'waste'|'carbon'|'notice'|'horoscope'|'seasonal'|'cleanup';
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const T = {
+  navy:        '#0A2240',
+  green:       '#1A6B3C',
+  greenDark:   '#166534',
+  surface:     '#F5F7FA',
+  border:      '#DDE2EA',
+  textPrimary: '#0D1B2A',
+  textMuted:   '#4A5568',
+  danger:      '#991B1B',
+  warning:     '#92400E',
+  card:        '#FFFFFF',
+};
 
+type Tool = 'waste' | 'carbon' | 'notice' | 'advisory' | 'seasonal' | 'cleanup';
+
+// ── SVG Icons ─────────────────────────────────────────────────────────────────
+const Icon = {
+  Recycle: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
+      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+    </svg>
+  ),
+  Globe: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  ),
+  FileText: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+  ),
+  Wind: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+    </svg>
+  ),
+  Calendar: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  ),
+  Camera: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  ),
+  Upload: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+      <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+    </svg>
+  ),
+  Check: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  X: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+  ArrowRight: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+    </svg>
+  ),
+  Copy: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  ),
+  RefreshCw: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10"/>
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </svg>
+  ),
+  Brain: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.96-3 2.5 2.5 0 0 1-1.32-4.24A3 3 0 0 1 2 10a3 3 0 0 1 3-3 2.5 2.5 0 0 1 4.5-5z"/>
+      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.96-3 2.5 2.5 0 0 0 1.32-4.24A3 3 0 0 0 22 10a3 3 0 0 0-3-3 2.5 2.5 0 0 0-4.5-5z"/>
+    </svg>
+  ),
+};
+
+// ── Shared styles ─────────────────────────────────────────────────────────────
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '0.5rem 0.75rem',
+  border: `1.5px solid ${T.border}`, borderRadius: 4,
+  fontSize: '0.875rem', color: T.textPrimary,
+  background: 'white', outline: 'none',
+  boxSizing: 'border-box', fontFamily: 'inherit',
+};
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontWeight: 600, fontSize: '0.75rem',
+  color: T.textPrimary, marginBottom: '0.375rem',
+  textTransform: 'uppercase', letterSpacing: '0.05em',
+};
+const primaryBtn = (disabled = false): React.CSSProperties => ({
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  padding: '0.5625rem 1.25rem',
+  background: disabled ? '#9CA3AF' : T.navy,
+  color: 'white', border: 'none', borderRadius: 4,
+  fontWeight: 600, fontSize: '0.8125rem',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  transition: 'all 0.15s', letterSpacing: '0.01em',
+  width: '100%', 
+});
+const outlineBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '0.5rem 1rem', background: 'white',
+  color: T.navy, border: `1.5px solid ${T.navy}`,
+  borderRadius: 4, fontWeight: 600, fontSize: '0.8125rem',
+  cursor: 'pointer', transition: 'all 0.15s',
+};
+const sectionCard: React.CSSProperties = {
+  border: `1px solid ${T.border}`, borderRadius: 6,
+  background: T.card, overflow: 'hidden',
+};
+const sectionHeader: React.CSSProperties = {
+  padding: '0.875rem 1.25rem', borderBottom: `1px solid ${T.border}`,
+  display: 'flex', alignItems: 'center', gap: 8,
+};
+const sectionBody: React.CSSProperties = { padding: '1.25rem' };
+
+// ── Spinner ───────────────────────────────────────────────────────────────────
+const Spin = () => (
+  <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+);
+
+// ── Upload zone ───────────────────────────────────────────────────────────────
+function UploadZone({ preview, label, onClick }: { preview: string; label: string; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        border: `1.5px dashed ${preview ? T.navy : T.border}`,
+        borderRadius: 6, padding: '1.5rem', textAlign: 'center',
+        cursor: 'pointer', transition: 'all 0.15s',
+        background: preview ? `${T.navy}05` : T.surface,
+      }}
+      onMouseEnter={e => { if (!preview) e.currentTarget.style.borderColor = T.navy; }}
+      onMouseLeave={e => { if (!preview) e.currentTarget.style.borderColor = T.border; }}
+    >
+      {preview ? (
+        <img src={preview} alt={label} style={{ maxHeight: 160, margin: '0 auto', borderRadius: 4, objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <>
+          <div style={{ color: T.textMuted, marginBottom: 8 }}><Icon.Upload /></div>
+          <p style={{ fontWeight: 600, fontSize: '0.875rem', color: T.textPrimary, marginBottom: 2 }}>{label}</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted }}>Click to select file</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Info row ──────────────────────────────────────────────────────────────────
+function InfoRow({ label, value }: { label: string; value?: string }) {
+  return value ? (
+    <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0', borderBottom: `1px solid ${T.border}` }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', width: 140, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: '0.875rem', color: T.textPrimary }}>{value}</span>
+    </div>
+  ) : null;
+}
+
+// ── Metric bar ────────────────────────────────────────────────────────────────
+function MetricBar({ label, value, total, color = T.navy }: { label: string; value: number; total: number; color?: string }) {
+  const pct = Math.min(100, Math.round((value / (total || 1)) * 100));
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <span style={{ fontSize: '0.8125rem', color: T.textMuted, width: 120, flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1, height: 5, background: T.border, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.7s ease' }} />
+      </div>
+      <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: T.textPrimary, width: 48, textAlign: 'right', flexShrink: 0 }}>{value.toFixed(0)} kg</span>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function AIToolsPage() {
   const [searchParams] = useSearchParams();
   const defaultTab = (searchParams.get('tab') as Tool) || 'waste';
   const [tool, setTool] = useState<Tool>(defaultTab);
   const { currentAQI } = useAppStore();
 
+  const TOOLS: { key: Tool; icon: React.ReactNode; label: string; desc: string }[] = [
+    { key: 'waste',    icon: <Icon.Recycle />,  label: 'Waste Classifier',   desc: 'AI waste segregation' },
+    { key: 'carbon',   icon: <Icon.Globe />,    label: 'Carbon Footprint',   desc: 'Calculate your impact' },
+    { key: 'notice',   icon: <Icon.FileText />, label: 'Notice Generator',   desc: 'Official BBMP notices' },
+    { key: 'advisory', icon: <Icon.Wind />,     label: 'Air Advisory',       desc: 'Daily AQI guidance' },
+    { key: 'seasonal', icon: <Icon.Calendar />, label: 'Seasonal Forecast',  desc: 'Monthly predictions' },
+    { key: 'cleanup',  icon: <Icon.Camera />,   label: 'Cleanup Verifier',   desc: 'Before & after AI check' },
+  ];
+
   return (
-    <div className="space-y-5 page-enter">
-      <div>
-        <h1 className="text-2xl font-bold">🤖 AI Tools</h1>
-        <p className="text-sm text-muted-foreground">Powered by Gemini AI via OpenRouter</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: "'DM Sans','Inter',sans-serif" }}>
+
+      {/* ── Page header ── */}
+      <div style={{ borderBottom: `1px solid ${T.border}`, paddingBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 6, background: T.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+            <Icon.Brain />
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: T.textPrimary, letterSpacing: '-0.02em', margin: 0 }}>
+            AI Intelligence Suite
+          </h1>
+        </div>
+        <p style={{ color: T.textMuted, fontSize: '0.875rem', margin: 0 }}>
+          Environmental analysis tools powered by AI — waste classification, carbon audit, official notice generation and more
+        </p>
       </div>
 
-      {/* Tool selector */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {([
-          { key:'waste' as Tool, icon:'♻️', label:'Waste Classifier' },
-          { key:'carbon' as Tool, icon:'🌍', label:'Carbon Calc' },
-          { key:'notice' as Tool, icon:'📄', label:'Notice Gen' },
-          { key:'horoscope' as Tool, icon:'🌤', label:'Air Horoscope' },
-          { key:'seasonal' as Tool, icon:'📅', label:'Seasonal Forecast' },
-          { key:'cleanup' as Tool, icon:'💪', label:'Cleanup Verify' },
-        ] as {key:Tool;icon:string;label:string}[]).map(t => (
-          <button key={t.key} onClick={() => setTool(t.key)} className={cn('flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-xs font-medium transition-all', tool===t.key?'border-primary bg-primary/5 text-primary':'border-border hover:border-primary/50 text-muted-foreground')}>
-            <span className="text-2xl">{t.icon}</span>{t.label}
+      {/* ── Tool selector ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '0.625rem' }}>
+        {TOOLS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTool(t.key)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '0.75rem 1rem', textAlign: 'left',
+              border: `1.5px solid ${tool === t.key ? T.navy : T.border}`,
+              borderRadius: 6, background: tool === t.key ? `${T.navy}08` : 'white',
+              color: tool === t.key ? T.navy : T.textPrimary,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            <div style={{ color: tool === t.key ? T.navy : T.textMuted, flexShrink: 0 }}>{t.icon}</div>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: '0.8125rem', margin: 0 }}>{t.label}</p>
+              <p style={{ fontSize: '0.7rem', color: T.textMuted, margin: 0 }}>{t.desc}</p>
+            </div>
           </button>
         ))}
       </div>
 
-      {tool === 'waste' && <WasteClassifier />}
-      {tool === 'carbon' && <CarbonCalculator />}
-      {tool === 'notice' && <NoticeGenerator />}
-      {tool === 'horoscope' && <AQIHoroscope aqi={currentAQI} />}
+      {/* ── Tool panels ── */}
+      {tool === 'waste'    && <WasteClassifier />}
+      {tool === 'carbon'   && <CarbonCalculator />}
+      {tool === 'notice'   && <NoticeGenerator />}
+      {tool === 'advisory' && <AirAdvisory aqi={currentAQI} />}
       {tool === 'seasonal' && <SeasonalForecast />}
-      {tool === 'cleanup' && <CleanupVerifier />}
+      {tool === 'cleanup'  && <CleanupVerifier />}
     </div>
   );
 }
 
 // ── Waste Classifier ──────────────────────────────────────────────────────────
 function WasteClassifier() {
-  const [image, setImage] = useState('');
+  const [image, setImage]     = useState('');
   const [preview, setPreview] = useState('');
-  const [result, setResult] = useState<Record<string,unknown> | null>(null);
+  const [result, setResult]   = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -64,359 +283,594 @@ function WasteClassifier() {
   const classify = async () => {
     if (!image) return;
     setLoading(true);
-    try { setResult(await api.ai.classifyWaste(image) as Record<string,unknown>); }
-    catch { toast('Classification failed', 'error'); }
+    try { setResult(await api.ai.classifyWaste(image) as Record<string, unknown>); }
+    catch { toast('Classification failed. Please try again.', 'error'); }
     finally { setLoading(false); }
   };
 
-  const BIN_COLORS: Record<string,string> = { green:'bg-green-500', blue:'bg-blue-500', red:'bg-red-500', black:'bg-gray-800' };
+  const r = result as { bin_color?: string; primary_category?: string; is_recyclable?: boolean; segregation_tip?: string; environmental_note?: string; items?: { name: string; category: string; disposal: string }[] } | null;
+  const BIN_HEX: Record<string, string> = { green: '#166534', blue: '#1E40AF', red: '#991B1B', black: '#111827' };
 
   return (
-    <Card>
-      <CardHeader><CardTitle>♻️ Household Waste Segregation AI</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Upload a photo of waste and AI will tell you how to segregate it properly.</p>
-        <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:border-primary/60 transition-all">
-          {preview ? <img src={preview} alt="waste" className="max-h-48 mx-auto rounded-lg object-cover" /> : <><div className="text-4xl mb-2">🗑️</div><p className="text-sm font-medium">Click to upload waste photo</p></>}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    <div style={sectionCard}>
+      <div style={sectionHeader}>
+        <div style={{ color: T.navy }}><Icon.Recycle /></div>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Waste Segregation Classifier</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>Upload a photo — AI identifies the waste type and correct disposal bin</p>
         </div>
-        {preview && <Button className="w-full" onClick={classify} disabled={loading}>{loading ? <><Spinner size="sm"/> Classifying...</> : '🤖 Classify Waste'}</Button>}
-        {result && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className={cn('w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg', BIN_COLORS[(result as {bin_color?:string}).bin_color||'blue']||'bg-blue-500')}>
-                {(result as {bin_color?:string}).bin_color?.[0]?.toUpperCase()||'B'}
+      </div>
+      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <UploadZone preview={preview} label="Upload Waste Photo" onClick={() => fileRef.current?.click()} />
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+
+        {preview && (
+          <button style={primaryBtn(loading)} onClick={classify} disabled={loading}>
+            {loading ? <><Spin /> Classifying...</> : 'Run AI Classification'}
+          </button>
+        )}
+
+        {r && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            {/* Result header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 6, flexShrink: 0,
+                background: BIN_HEX[r.bin_color || 'blue'] || '#1E40AF',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'white', fontWeight: 800, fontSize: '1.125rem',
+              }}>
+                {(r.bin_color || 'B')[0].toUpperCase()}
               </div>
-              <div>
-                <p className="font-semibold capitalize">{(result as {primary_category?:string}).primary_category} Waste</p>
-                <p className="text-sm text-muted-foreground">{(result as {bin_color?:string}).bin_color} bin</p>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0, textTransform: 'capitalize' }}>
+                  {r.primary_category} Waste
+                </p>
+                <p style={{ fontSize: '0.8125rem', color: T.textMuted, margin: '2px 0 0', textTransform: 'capitalize' }}>
+                  Dispose in the {r.bin_color} bin
+                </p>
               </div>
-              <Badge variant={(result as {is_recyclable?:boolean}).is_recyclable?'success':'warning'} className="ml-auto">{(result as {is_recyclable?:boolean}).is_recyclable?'♻️ Recyclable':'⚠️ Non-recyclable'}</Badge>
+              <span style={{
+                padding: '0.2rem 0.6rem', borderRadius: 3, fontSize: '0.75rem', fontWeight: 700,
+                background: r.is_recyclable ? '#F0FDF4' : '#FFFBEB',
+                color: r.is_recyclable ? '#166534' : '#92400E',
+                border: `1px solid ${r.is_recyclable ? '#BBF7D0' : '#FDE68A'}`,
+              }}>
+                {r.is_recyclable ? 'Recyclable' : 'Non-recyclable'}
+              </span>
             </div>
-            <div className="bg-accent rounded-xl p-4">
-              <p className="font-medium text-sm mb-2">📋 Segregation Guide</p>
-              <p className="text-sm text-muted-foreground">{(result as {segregation_tip?:string}).segregation_tip}</p>
-            </div>
-            {(result as {items?:{name:string;category:string;disposal:string}[]}).items?.map((item,i) => (
-              <div key={i} className="flex gap-3 p-3 border rounded-xl text-sm">
-                <span className="font-medium flex-1">{item.name}</span>
-                <Badge variant="info" className="capitalize">{item.category}</Badge>
-                <span className="text-muted-foreground text-xs self-center">{item.disposal}</span>
+
+            {/* Segregation tip */}
+            {r.segregation_tip && (
+              <div style={{ padding: '0.875rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Disposal Guidance</p>
+                <p style={{ fontSize: '0.875rem', color: '#1E3A8A', margin: 0, lineHeight: 1.5 }}>{r.segregation_tip}</p>
               </div>
-            ))}
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-sm text-green-700 dark:text-green-400">🌍 {(result as {environmental_note?:string}).environmental_note}</div>
+            )}
+
+            {/* Item breakdown */}
+            {r.items && r.items.length > 0 && (
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ padding: '0.5rem 0.875rem', background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                  <p style={{ fontWeight: 600, fontSize: '0.75rem', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Items Detected</p>
+                </div>
+                {r.items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderBottom: i < r.items!.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                    <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: T.textPrimary }}>{item.name}</span>
+                    <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.45rem', background: '#EFF6FF', color: '#1E40AF', border: '1px solid #BFDBFE', borderRadius: 3, textTransform: 'capitalize' }}>{item.category}</span>
+                    <span style={{ fontSize: '0.75rem', color: T.textMuted }}>{item.disposal}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {r.environmental_note && (
+              <div style={{ padding: '0.75rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6, fontSize: '0.8125rem', color: '#166534' }}>
+                {r.environmental_note}
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 // ── Carbon Calculator ─────────────────────────────────────────────────────────
 function CarbonCalculator() {
-  const [form, setForm] = useState({ transportMode:'bus', distanceKm:10, electricityKwh:100, lpgCylinders:1, meatMealsPerWeek:3, flightsPerYear:1 });
-  const [result, setResult] = useState<Record<string,unknown> | null>(null);
+  const [form, setForm] = useState({ transportMode: 'bus', distanceKm: 10, electricityKwh: 100, lpgCylinders: 1, meatMealsPerWeek: 3, flightsPerYear: 1 });
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const calc = async () => {
     setLoading(true);
-    try { setResult(await api.ai.carbon(form) as Record<string,unknown>); }
-    catch { toast('Calculation failed', 'error'); }
+    try { setResult(await api.ai.carbon(form) as Record<string, unknown>); }
+    catch { toast('Calculation failed. Please try again.', 'error'); }
     finally { setLoading(false); }
   };
 
-  const RATING_COLORS: Record<string,string> = { excellent:'text-green-600', good:'text-emerald-600', average:'text-yellow-600', high:'text-orange-600', very_high:'text-red-600' };
+  const r = result as { totalCO2?: number; rating?: string; comparison?: string; breakdown?: Record<string, number>; tips?: string[]; trees_to_offset?: number } | null;
+  const ratingColor: Record<string, string> = { excellent: '#166534', good: '#1A6B3C', average: '#92400E', high: '#B45309', very_high: '#991B1B' };
 
   return (
-    <Card>
-      <CardHeader><CardTitle>🌍 Personal Carbon Footprint Calculator</CardTitle></CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="text-sm font-medium mb-1.5 block">🚗 Daily Transport Mode</label>
-            <Select value={form.transportMode} onChange={e=>setForm(f=>({...f,transportMode:e.target.value}))}>
-              <option value="walk">🚶 Walk</option><option value="cycle">🚲 Cycle</option>
-              <option value="metro">🚇 Metro</option><option value="bus">🚌 Bus</option>
-              <option value="auto">🛺 Auto</option><option value="bike">🏍 Bike</option>
-              <option value="car">🚗 Car</option>
-            </Select>
-          </div>
-          <div><label className="text-sm font-medium mb-1.5 block">📏 Daily Distance (km)</label>
-            <Input type="number" value={form.distanceKm} onChange={e=>setForm(f=>({...f,distanceKm:+e.target.value}))} min={0} />
-          </div>
-          <div><label className="text-sm font-medium mb-1.5 block">⚡ Monthly Electricity (kWh)</label>
-            <Input type="number" value={form.electricityKwh} onChange={e=>setForm(f=>({...f,electricityKwh:+e.target.value}))} min={0} />
-          </div>
-          <div><label className="text-sm font-medium mb-1.5 block">🔥 LPG Cylinders/month</label>
-            <Input type="number" value={form.lpgCylinders} onChange={e=>setForm(f=>({...f,lpgCylinders:+e.target.value}))} min={0} step={0.5} />
-          </div>
-          <div><label className="text-sm font-medium mb-1.5 block">🥩 Meat Meals/week</label>
-            <Input type="number" value={form.meatMealsPerWeek} onChange={e=>setForm(f=>({...f,meatMealsPerWeek:+e.target.value}))} min={0} />
-          </div>
-          <div><label className="text-sm font-medium mb-1.5 block">✈️ Flights/year</label>
-            <Input type="number" value={form.flightsPerYear} onChange={e=>setForm(f=>({...f,flightsPerYear:+e.target.value}))} min={0} />
-          </div>
+    <div style={sectionCard}>
+      <div style={sectionHeader}>
+        <div style={{ color: T.navy }}><Icon.Globe /></div>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Personal Carbon Footprint Audit</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>Calculate your annual CO₂ emissions based on lifestyle inputs</p>
         </div>
-        <Button className="w-full" onClick={calc} loading={loading}>Calculate My Carbon Footprint</Button>
-        {result && (
-          <div className="space-y-4">
-            <div className="text-center p-5 bg-accent rounded-2xl">
-              <div className={cn('text-5xl font-black', RATING_COLORS[(result as {rating?:string}).rating||'average'])}>{((result as {totalCO2?:number}).totalCO2||0).toLocaleString()}</div>
-              <div className="text-muted-foreground mt-1">kg CO₂ per year</div>
-              <Badge variant={(result as {rating?:string}).rating==='excellent'||result.rating==='good'?'success':result.rating==='high'||result.rating==='very_high'?'danger':'warning'} className="mt-2 capitalize">{(result as {rating?:string}).rating} footprint</Badge>
-              <p className="text-sm text-muted-foreground mt-2">{(result as {comparison?:string}).comparison}</p>
+      </div>
+      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.875rem' }}>
+          {[
+            { label: 'Daily Transport', key: 'transportMode', type: 'select', options: [['walk','Walk'],['cycle','Cycle'],['metro','Metro'],['bus','Bus'],['auto','Auto Rickshaw'],['bike','Motorcycle'],['car','Car']] },
+          ].map(f => (
+            <div key={f.key}>
+              <label style={labelStyle}>{f.label}</label>
+              <select style={{ ...inputStyle, appearance: 'none' }}
+                value={(form as Record<string,unknown>)[f.key] as string}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                onFocus={e => (e.target.style.borderColor = T.navy)}
+                onBlur={e => (e.target.style.borderColor = T.border)}
+              >
+                {f.options?.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
             </div>
-            <div className="space-y-2">
-              <p className="font-semibold text-sm">📊 Breakdown</p>
-              {Object.entries((result as {breakdown?:Record<string,number>}).breakdown||{}).map(([k,v]) => (
-                <div key={k} className="flex gap-3 items-center">
-                  <span className="text-sm text-muted-foreground capitalize w-24">{k}</span>
-                  <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{width:`${Math.min(100,(v/((result as {totalCO2?:number}).totalCO2||1))*100)}%`}} />
-                  </div>
-                  <span className="text-sm font-medium w-16 text-right">{v.toFixed(0)} kg</span>
+          ))}
+          {[
+            { label: 'Daily Distance (km)', key: 'distanceKm' },
+            { label: 'Monthly Electricity (kWh)', key: 'electricityKwh' },
+            { label: 'LPG Cylinders / Month', key: 'lpgCylinders' },
+            { label: 'Meat Meals / Week', key: 'meatMealsPerWeek' },
+            { label: 'Flights / Year', key: 'flightsPerYear' },
+          ].map(f => (
+            <div key={f.key}>
+              <label style={labelStyle}>{f.label}</label>
+              <input type="number" min={0} style={inputStyle}
+                value={(form as Record<string,unknown>)[f.key] as number}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: +e.target.value }))}
+                onFocus={e => (e.target.style.borderColor = T.navy)}
+                onBlur={e => (e.target.style.borderColor = T.border)}
+              />
+            </div>
+          ))}
+        </div>
+
+        <button style={primaryBtn(loading)} onClick={calc} disabled={loading}>
+          {loading ? <><Spin /> Calculating...</> : 'Calculate Annual Footprint'}
+        </button>
+
+        {r && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Score panel */}
+            <div style={{ background: T.navy, borderRadius: 6, padding: '1.25rem', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Annual CO₂ Emissions</p>
+              <p style={{ fontSize: '3.5rem', fontWeight: 800, color: ratingColor[r.rating || 'average'] || 'white', margin: 0, lineHeight: 1, letterSpacing: '-0.03em' }}>
+                {(r.totalCO2 || 0).toLocaleString()}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.875rem', margin: '4px 0 12px' }}>kg CO₂ per year</p>
+              <span style={{
+                display: 'inline-block', padding: '0.25rem 0.75rem',
+                background: ratingColor[r.rating || 'average'] + '25',
+                color: ratingColor[r.rating || 'average'] || 'white',
+                border: `1px solid ${ratingColor[r.rating || 'average'] || 'white'}50`,
+                borderRadius: 4, fontSize: '0.8125rem', fontWeight: 700, textTransform: 'capitalize',
+              }}>{r.rating} footprint</span>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8125rem', marginTop: 8 }}>{r.comparison}</p>
+            </div>
+
+            {/* Breakdown */}
+            {r.breakdown && Object.keys(r.breakdown).length > 0 && (
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ padding: '0.625rem 1rem', background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                  <p style={{ fontWeight: 600, fontSize: '0.75rem', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Emissions Breakdown</p>
                 </div>
-              ))}
-            </div>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 space-y-2">
-              <p className="font-semibold text-green-700 dark:text-green-400 text-sm">💡 AI Tips</p>
-              {((result as {tips?:string[]}).tips||[]).map((tip,i) => <p key={i} className="text-sm text-green-700 dark:text-green-300 flex gap-2"><span>→</span>{tip}</p>)}
-            </div>
-            <div className="text-center text-sm text-muted-foreground">🌳 Plant <b>{(result as {trees_to_offset?:number}).trees_to_offset}</b> trees to offset your annual footprint</div>
+                <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                  {Object.entries(r.breakdown).map(([k, v]) => (
+                    <MetricBar key={k} label={k.charAt(0).toUpperCase() + k.slice(1)} value={v} total={r.totalCO2 || 1} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tips */}
+            {r.tips && r.tips.length > 0 && (
+              <div style={{ padding: '1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: T.greenDark, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.625rem' }}>Reduction Recommendations</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                  {r.tips.map((tip, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, fontSize: '0.875rem', color: '#166534' }}>
+                      <span style={{ flexShrink: 0, marginTop: 2 }}><Icon.ArrowRight /></span>{tip}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {r.trees_to_offset && (
+              <div style={{ textAlign: 'center', padding: '0.75rem', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: '0.875rem', color: T.textMuted }}>
+                Plant <strong style={{ color: T.textPrimary }}>{r.trees_to_offset}</strong> trees to fully offset your annual carbon footprint
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 // ── Notice Generator ──────────────────────────────────────────────────────────
 function NoticeGenerator() {
-  const [form, setForm] = useState({ noticeType:'public_notice', topic:'', ward:'', details:'', language:'english' });
-  const [result, setResult] = useState<{content?:string;reference?:string} | null>(null);
+  const [form, setForm] = useState({ noticeType: 'public_notice', topic: '', ward: '', details: '', language: 'english' });
+  const [result, setResult] = useState<{ content?: string; reference?: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const generate = async () => {
-    if (!form.topic) { toast('Please enter a topic', 'error'); return; }
+    if (!form.topic) { toast('Subject / topic is required.', 'error'); return; }
     setLoading(true);
     try { setResult(await api.ai.notice(form.noticeType, form.topic, form.ward, form.details, form.language) as typeof result); }
-    catch { toast('Generation failed', 'error'); }
+    catch { toast('Generation failed. Please try again.', 'error'); }
     finally { setLoading(false); }
   };
 
   return (
-    <Card>
-      <CardHeader><CardTitle>📄 AI Official Notice Generator</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Generate professional BBMP notices, circulars, press releases and social media content instantly.</p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="text-sm font-medium mb-1.5 block">Notice Type</label>
-            <Select value={form.noticeType} onChange={e=>setForm(f=>({...f,noticeType:e.target.value}))}>
-              <option value="public_notice">📢 Public Notice</option>
-              <option value="circular">📋 Office Circular</option>
-              <option value="warning_letter">⚠️ Warning Letter</option>
-              <option value="awareness_campaign">📣 Awareness Campaign</option>
-              <option value="press_release">📰 Press Release</option>
-              <option value="social_media">📱 Social Media Captions</option>
-            </Select>
+    <div style={sectionCard}>
+      <div style={sectionHeader}>
+        <div style={{ color: T.navy }}><Icon.FileText /></div>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Official Notice Generator</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>Generate BBMP-grade notices, circulars, warning letters, and press releases instantly</p>
+        </div>
+      </div>
+      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+          <div>
+            <label style={labelStyle}>Document Type</label>
+            <select style={{ ...inputStyle, appearance: 'none' }} value={form.noticeType} onChange={e => setForm(f => ({ ...f, noticeType: e.target.value }))}
+              onFocus={e => (e.target.style.borderColor = T.navy)} onBlur={e => (e.target.style.borderColor = T.border)}>
+              <option value="public_notice">Public Notice</option>
+              <option value="circular">Office Circular</option>
+              <option value="warning_letter">Warning Letter</option>
+              <option value="awareness_campaign">Awareness Campaign</option>
+              <option value="press_release">Press Release</option>
+              <option value="social_media">Social Media Bulletin</option>
+            </select>
           </div>
-          <div><label className="text-sm font-medium mb-1.5 block">Language</label>
-            <Select value={form.language} onChange={e=>setForm(f=>({...f,language:e.target.value}))}>
+          <div>
+            <label style={labelStyle}>Language</label>
+            <select style={{ ...inputStyle, appearance: 'none' }} value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value }))}
+              onFocus={e => (e.target.style.borderColor = T.navy)} onBlur={e => (e.target.style.borderColor = T.border)}>
               <option value="english">English</option>
-              <option value="hindi">हिंदी</option>
-              <option value="kannada">ಕನ್ನಡ</option>
-            </Select>
+              <option value="hindi">Hindi</option>
+              <option value="kannada">Kannada</option>
+            </select>
           </div>
         </div>
-        <div><label className="text-sm font-medium mb-1.5 block">Topic / Subject *</label><Input value={form.topic} onChange={e=>setForm(f=>({...f,topic:e.target.value}))} placeholder="e.g. Garbage burning ban in residential areas" /></div>
-        <div><label className="text-sm font-medium mb-1.5 block">Ward (optional)</label><Input value={form.ward} onChange={e=>setForm(f=>({...f,ward:e.target.value}))} placeholder="e.g. Koramangala" /></div>
-        <div><label className="text-sm font-medium mb-1.5 block">Additional Details</label><Textarea value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))} rows={3} placeholder="Any specific details, fine amounts, deadlines..." /></div>
-        <Button className="w-full" onClick={generate} loading={loading}>⚡ Generate Notice</Button>
+        <div>
+          <label style={labelStyle}>Subject / Topic <span style={{ color: T.danger }}>*</span></label>
+          <input style={inputStyle} value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))}
+            placeholder="e.g. Prohibition of garbage burning in residential areas"
+            onFocus={e => (e.target.style.borderColor = T.navy)} onBlur={e => (e.target.style.borderColor = T.border)} />
+        </div>
+        <div>
+          <label style={labelStyle}>Ward <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: T.textMuted }}>(optional)</span></label>
+          <input style={inputStyle} value={form.ward} onChange={e => setForm(f => ({ ...f, ward: e.target.value }))}
+            placeholder="e.g. Koramangala, Whitefield"
+            onFocus={e => (e.target.style.borderColor = T.navy)} onBlur={e => (e.target.style.borderColor = T.border)} />
+        </div>
+        <div>
+          <label style={labelStyle}>Additional Context</label>
+          <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical', lineHeight: 1.6 }} rows={3}
+            value={form.details} onChange={e => setForm(f => ({ ...f, details: e.target.value }))}
+            placeholder="Fine amounts, deadlines, contact details, specific regulations..."
+            onFocus={e => (e.target.style.borderColor = T.navy)} onBlur={e => (e.target.style.borderColor = T.border)} />
+        </div>
+        <button style={primaryBtn(loading || !form.topic)} onClick={generate} disabled={loading || !form.topic}>
+          {loading ? <><Spin /> Generating...</> : 'Generate Document'}
+        </button>
+
         {result && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Badge variant="info">Ref: {result.reference}</Badge>
-              <button onClick={() => { navigator.clipboard.writeText(result.content||''); toast('Copied!', 'success'); }} className="text-xs text-primary hover:underline">📋 Copy</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: T.textMuted }}>REF: {result.reference}</span>
+              <button
+                style={{ ...outlineBtn, padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
+                onClick={() => { navigator.clipboard.writeText(result.content || ''); toast('Copied to clipboard.', 'success'); }}
+              >
+                <Icon.Copy /> Copy
+              </button>
             </div>
-            <div className="bg-accent rounded-xl p-5 whitespace-pre-wrap text-sm font-mono leading-relaxed border">{result.content}</div>
+            <div style={{
+              padding: '1.25rem', background: T.surface,
+              border: `1px solid ${T.border}`, borderRadius: 6,
+              whiteSpace: 'pre-wrap', fontSize: '0.875rem',
+              fontFamily: "'Courier New',monospace", lineHeight: 1.7, color: T.textPrimary,
+            }}>
+              {result.content}
+            </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// ── AQI Horoscope ─────────────────────────────────────────────────────────────
-function AQIHoroscope({ aqi }: { aqi: number }) {
-  const [result, setResult] = useState<Record<string,unknown> | null>(null);
+// ── Air Advisory (replaces AQI Horoscope) ────────────────────────────────────
+function AirAdvisory({ aqi }: { aqi: number }) {
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetch = async () => {
+  const fetchAdvisory = async () => {
     setLoading(true);
-    try { setResult(await api.ai.horoscope(aqi) as Record<string,unknown>); }
-    catch { toast('Failed to fetch horoscope', 'error'); }
+    try { setResult(await api.ai.horoscope(aqi) as Record<string, unknown>); }
+    catch { toast('Failed to load advisory. Please try again.', 'error'); }
     finally { setLoading(false); }
   };
 
-  React.useEffect(() => { fetch(); }, []);
+  React.useEffect(() => { fetchAdvisory(); }, []);
+
+  const r = result as { title?: string; forecast?: string; outdoor_rating?: string; mask_tip?: string; best_time_outdoor?: string; exercise_tip?: string; weekly_trend?: string; eco_tip_of_day?: string } | null;
 
   return (
-    <Card>
-      <CardHeader><CardTitle>🌤 Daily Air Quality Horoscope</CardTitle></CardHeader>
-      <CardContent>
-        {loading ? <div className="flex justify-center py-12"><Spinner size="lg" /></div> : !result ? (
-          <div className="text-center py-8"><Button onClick={fetch}>Load Horoscope</Button></div>
+    <div style={sectionCard}>
+      <div style={sectionHeader}>
+        <div style={{ color: T.navy }}><Icon.Wind /></div>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Daily Air Quality Advisory</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>AI-generated health and activity guidance based on current AQI ({aqi})</p>
+        </div>
+      </div>
+      <div style={sectionBody}>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '3rem 0', color: T.textMuted }}>
+            <div style={{ width: 32, height: 32, border: `3px solid ${T.border}`, borderTopColor: T.navy, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
+            <p style={{ fontSize: '0.875rem' }}>Loading advisory...</p>
+          </div>
+        ) : !r ? (
+          <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+            <button style={{ ...outlineBtn, margin: '0 auto' }} onClick={fetchAdvisory}>Load Advisory</button>
+          </div>
         ) : (
-          <div className="space-y-5">
-            <div className="text-center py-4">
-              <div className="text-6xl mb-3">{(result as {emoji?:string}).emoji}</div>
-              <h2 className="text-xl font-bold mb-2">{(result as {title?:string}).title}</h2>
-              <p className="text-muted-foreground">{(result as {forecast?:string}).forecast}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Headline */}
+            <div style={{ padding: '1rem', background: T.navy, borderRadius: 6 }}>
+              <p style={{ fontWeight: 700, fontSize: '1rem', color: 'white', margin: '0 0 4px' }}>{r.title}</p>
+              <p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.5 }}>{r.forecast}</p>
             </div>
-            <div className="grid sm:grid-cols-2 gap-3">
+
+            {/* Advisory grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.75rem' }}>
               {[
-                { icon:'⭐', label:'Outdoor Rating', value:(result as {outdoor_rating?:string}).outdoor_rating },
-                { icon:'😷', label:'Mask', value:(result as {mask_tip?:string}).mask_tip },
-                { icon:'🕐', label:'Best Time Outside', value:(result as {best_time_outdoor?:string}).best_time_outdoor },
-                { icon:'🏃', label:'Exercise', value:(result as {exercise_tip?:string}).exercise_tip },
-                { icon:'🍀', label:'Lucky Color', value:(result as {lucky_color?:string}).lucky_color },
-                { icon:'📅', label:'3-Day Trend', value:(result as {weekly_trend?:string}).weekly_trend },
-              ].map(({ icon, label, value }) => (
-                <div key={label} className="flex gap-3 p-3 bg-accent rounded-xl">
-                  <span className="text-xl">{icon}</span>
-                  <div><p className="text-xs text-muted-foreground">{label}</p><p className="text-sm font-medium mt-0.5">{value}</p></div>
+                { label: 'Outdoor Activity Rating', value: r.outdoor_rating },
+                { label: 'Mask Recommendation',     value: r.mask_tip },
+                { label: 'Best Time Outdoors',      value: r.best_time_outdoor },
+                { label: 'Exercise Guidance',       value: r.exercise_tip },
+                { label: '3-Day Air Trend',         value: r.weekly_trend },
+              ].filter(item => item.value).map(item => (
+                <div key={item.label} style={{ padding: '0.875rem', border: `1px solid ${T.border}`, borderRadius: 6, background: T.surface }}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: 700, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</p>
+                  <p style={{ fontSize: '0.875rem', fontWeight: 600, color: T.textPrimary, margin: 0 }}>{item.value}</p>
                 </div>
               ))}
             </div>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 text-center">
-              <p className="text-sm font-medium text-green-700 dark:text-green-400">💡 Eco Tip of the Day</p>
-              <p className="text-sm text-green-600 dark:text-green-300 mt-1">{(result as {eco_tip_of_day?:string}).eco_tip_of_day}</p>
-            </div>
-            <Button variant="outline" className="w-full" onClick={fetch} loading={loading}>🔄 Refresh Horoscope</Button>
+
+            {r.eco_tip_of_day && (
+              <div style={{ padding: '0.875rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6 }}>
+                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: T.greenDark, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Eco Action of the Day</p>
+                <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>{r.eco_tip_of_day}</p>
+              </div>
+            )}
+
+            <button style={{ ...outlineBtn, justifyContent: 'center', width: '100%' }} onClick={fetchAdvisory}>
+              <Icon.RefreshCw /> Refresh Advisory
+            </button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 // ── Seasonal Forecast ─────────────────────────────────────────────────────────
 function SeasonalForecast() {
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [result, setResult] = useState<Record<string,unknown> | null>(null);
+  const [month, setMonth]   = useState(new Date().getMonth() + 1);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetch = async () => {
+  const fetchForecast = async () => {
     setLoading(true);
-    try { setResult(await api.ai.seasonal(month) as Record<string,unknown>); }
-    catch { toast('Failed to fetch forecast', 'error'); }
+    try { setResult(await api.ai.seasonal(month) as Record<string, unknown>); }
+    catch { toast('Forecast unavailable. Please try again.', 'error'); }
     finally { setLoading(false); }
   };
 
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const r = result as { aqi_prediction?: { average?: number; min?: number; max?: number }; green_cover_status?: string; waste_generation_trend?: string; main_concerns?: string[]; festival_impact?: string; weather_impact?: string; health_alert?: string; recommended_actions?: string[] } | null;
 
   return (
-    <Card>
-      <CardHeader><CardTitle>📅 Seasonal Pollution Forecast</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-3">
-          <Select value={month} onChange={e => setMonth(+e.target.value)} className="flex-1">
-            {MONTHS.map((m,i) => <option key={i} value={i+1}>{m}</option>)}
-          </Select>
-          <Button onClick={fetch} loading={loading}>Predict</Button>
+    <div style={sectionCard}>
+      <div style={sectionHeader}>
+        <div style={{ color: T.navy }}><Icon.Calendar /></div>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Seasonal Pollution Forecast</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>AI prediction of pollution levels and environmental conditions by month</p>
         </div>
-        {result && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-accent rounded-xl p-3">
-                <p className="text-2xl font-bold text-primary">{(result as {aqi_prediction?:{average?:number}}).aqi_prediction?.average}</p>
-                <p className="text-xs text-muted-foreground">Avg AQI</p>
-              </div>
-              <div className="bg-accent rounded-xl p-3">
-                <p className="font-bold text-sm">{(result as {green_cover_status?:string}).green_cover_status}</p>
-                <p className="text-xs text-muted-foreground">Green Cover</p>
-              </div>
-              <div className="bg-accent rounded-xl p-3">
-                <p className="font-bold text-sm capitalize">{(result as {waste_generation_trend?:string}).waste_generation_trend}</p>
-                <p className="text-xs text-muted-foreground">Waste Trend</p>
-              </div>
+      </div>
+      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <select style={{ ...inputStyle, flex: 1, appearance: 'none' }} value={month} onChange={e => setMonth(+e.target.value)}
+            onFocus={e => (e.target.style.borderColor = T.navy)} onBlur={e => (e.target.style.borderColor = T.border)}>
+            {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+          </select>
+          <button style={{ ...primaryBtn(loading), width: 'auto', padding: '0.5rem 1.25rem' }} onClick={fetchForecast} disabled={loading}>
+            {loading ? <Spin /> : 'Predict'}
+          </button>
+        </div>
+
+        {r && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            {/* AQI summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.75rem' }}>
+              {[
+                { label: 'Avg AQI',      value: r.aqi_prediction?.average },
+                { label: 'Green Cover',  value: r.green_cover_status },
+                { label: 'Waste Trend',  value: r.waste_generation_trend },
+              ].map(m => (
+                <div key={m.label} style={{ textAlign: 'center', padding: '0.875rem', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6 }}>
+                  <p style={{ fontSize: '1.5rem', fontWeight: 800, color: T.navy, margin: 0, letterSpacing: '-0.02em' }}>{m.value}</p>
+                  <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: '4px 0 0', textTransform: 'capitalize' }}>{m.label}</p>
+                </div>
+              ))}
             </div>
-            <div><p className="font-semibold text-sm mb-2">⚠️ Main Concerns</p>
-              <div className="flex flex-wrap gap-2">{((result as {main_concerns?:string[]}).main_concerns||[]).map((c,i) => <Badge key={i} variant="warning">{c}</Badge>)}</div>
-            </div>
-            {(result as {festival_impact?:string}).festival_impact && <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-3 text-sm"><p className="font-medium text-orange-700 dark:text-orange-400">🎉 Festival Impact</p><p className="text-muted-foreground mt-1">{(result as {festival_impact?:string}).festival_impact}</p></div>}
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-sm"><p className="font-medium text-blue-700 dark:text-blue-400">🌧 Weather Impact</p><p className="text-muted-foreground mt-1">{(result as {weather_impact?:string}).weather_impact}</p></div>
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-sm"><p className="font-medium text-red-700 dark:text-red-400">🏥 Health Alert</p><p className="text-muted-foreground mt-1">{(result as {health_alert?:string}).health_alert}</p></div>
+
+            {/* Concerns */}
+            {r.main_concerns && r.main_concerns.length > 0 && (
+              <div style={{ padding: '0.875rem', border: `1px solid #FDE68A`, background: '#FFFBEB', borderRadius: 6 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Primary Concerns</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                  {r.main_concerns.map((c, i) => (
+                    <span key={i} style={{ padding: '0.15rem 0.6rem', background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', borderRadius: 3, fontSize: '0.8125rem', fontWeight: 600 }}>{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {r.festival_impact && (
+              <div style={{ padding: '0.875rem', border: `1px solid #DDE2EA`, background: T.surface, borderRadius: 6 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Festival / Event Impact</p>
+                <p style={{ fontSize: '0.875rem', color: T.textPrimary, margin: 0, lineHeight: 1.5 }}>{r.festival_impact}</p>
+              </div>
+            )}
+            {r.weather_impact && (
+              <div style={{ padding: '0.875rem', border: '1px solid #BFDBFE', background: '#EFF6FF', borderRadius: 6 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Meteorological Impact</p>
+                <p style={{ fontSize: '0.875rem', color: '#1E3A8A', margin: 0, lineHeight: 1.5 }}>{r.weather_impact}</p>
+              </div>
+            )}
+            {r.health_alert && (
+              <div style={{ padding: '0.875rem', border: '1px solid #FECACA', background: '#FFF5F5', borderRadius: 6 }}>
+                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: T.danger, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Health Advisory</p>
+                <p style={{ fontSize: '0.875rem', color: '#7F1D1D', margin: 0, lineHeight: 1.5 }}>{r.health_alert}</p>
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 // ── Cleanup Verifier ──────────────────────────────────────────────────────────
 function CleanupVerifier() {
-  const [before, setBefore] = useState('');
-  const [after, setAfter] = useState('');
+  const [before, setBefore]             = useState('');
+  const [after, setAfter]               = useState('');
   const [beforePreview, setBeforePreview] = useState('');
-  const [afterPreview, setAfterPreview] = useState('');
-  const [result, setResult] = useState<Record<string,unknown> | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [afterPreview, setAfterPreview]   = useState('');
+  const [result, setResult]             = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading]           = useState(false);
   const beforeRef = useRef<HTMLInputElement>(null);
-  const afterRef = useRef<HTMLInputElement>(null);
+  const afterRef  = useRef<HTMLInputElement>(null);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>, which: 'before'|'after') => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>, which: 'before' | 'after') => {
     const f = e.target.files?.[0]; if (!f) return;
     const b64 = await imageToBase64(f);
-    if (which==='before') { setBefore(b64); setBeforePreview(b64); }
+    if (which === 'before') { setBefore(b64); setBeforePreview(b64); }
     else { setAfter(b64); setAfterPreview(b64); }
   };
 
   const verify = async () => {
-    if (!before||!after) { toast('Upload both images first', 'error'); return; }
+    if (!before || !after) { toast('Both images are required.', 'error'); return; }
     setLoading(true);
-    try { setResult(await api.ai.verifyCleanup(before, after) as Record<string,unknown>); }
-    catch { toast('Verification failed', 'error'); }
+    try { setResult(await api.ai.verifyCleanup(before, after) as Record<string, unknown>); }
+    catch { toast('Verification failed. Please try again.', 'error'); }
     finally { setLoading(false); }
   };
 
+  const r = result as { verified?: boolean; message?: string; points_awarded?: number; before_description?: string; after_description?: string; changes_observed?: string[]; improvement_score?: number } | null;
+
   return (
-    <Card>
-      <CardHeader><CardTitle>💪 Before & After Cleanup Verifier</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Upload before and after photos — AI will verify your cleanup and award karma points!</p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {(['before','after'] as const).map(which => (
-            <div key={which} onClick={() => (which==='before'?beforeRef:afterRef).current?.click()} className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-primary/60 transition-all">
-              {(which==='before'?beforePreview:afterPreview) ? (
-                <img src={which==='before'?beforePreview:afterPreview} alt={which} className="max-h-40 mx-auto rounded-lg object-cover" />
-              ) : (
-                <><div className="text-3xl mb-2">{which==='before'?'📸':'🌟'}</div><p className="text-sm font-medium capitalize">{which} Photo</p><p className="text-xs text-muted-foreground mt-1">Click to upload</p></>
-              )}
-              <input ref={which==='before'?beforeRef:afterRef} type="file" accept="image/*" className="hidden" onChange={e=>handleFile(e,which)} />
-            </div>
-          ))}
+    <div style={sectionCard}>
+      <div style={sectionHeader}>
+        <div style={{ color: T.navy }}><Icon.Camera /></div>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Cleanup Impact Verifier</p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>Upload before and after photos — AI assesses cleanup effectiveness and awards Karma</p>
         </div>
-        <Button className="w-full" onClick={verify} disabled={!before||!after||loading} loading={loading}>🤖 Verify Cleanup with AI</Button>
-        {result && (
-          <div className="space-y-3">
-            <div className={cn('rounded-xl p-4 text-center', (result as {verified?:boolean}).verified?'bg-green-50 dark:bg-green-900/20':'bg-red-50 dark:bg-red-900/20')}>
-              <div className="text-3xl mb-2">{(result as {verified?:boolean}).verified?'✅':'❌'}</div>
-              <p className="font-bold">{(result as {verified?:boolean}).verified?'Cleanup Verified!':'Improvement Not Detected'}</p>
-              <p className="text-sm text-muted-foreground mt-1">{(result as {message?:string}).message}</p>
-              {(result as {verified?:boolean}).verified && <p className="text-lg font-bold text-green-600 mt-2">+{(result as {points_awarded?:number}).points_awarded} Karma Points!</p>}
+      </div>
+      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+          <div>
+            <label style={{ ...labelStyle, marginBottom: '0.5rem' }}>Before Photo</label>
+            <UploadZone preview={beforePreview} label="Before Cleanup" onClick={() => beforeRef.current?.click()} />
+            <input ref={beforeRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFile(e, 'before')} />
+          </div>
+          <div>
+            <label style={{ ...labelStyle, marginBottom: '0.5rem' }}>After Photo</label>
+            <UploadZone preview={afterPreview} label="After Cleanup" onClick={() => afterRef.current?.click()} />
+            <input ref={afterRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleFile(e, 'after')} />
+          </div>
+        </div>
+
+        <button style={primaryBtn(!before || !after || loading)} onClick={verify} disabled={!before || !after || loading}>
+          {loading ? <><Spin /> Verifying...</> : 'Verify with AI'}
+        </button>
+
+        {r && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            {/* Result banner */}
+            <div style={{
+              padding: '1.25rem', borderRadius: 6, textAlign: 'center',
+              background: r.verified ? '#F0FDF4' : '#FFF5F5',
+              border: `1px solid ${r.verified ? '#BBF7D0' : '#FECACA'}`,
+            }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', margin: '0 auto 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: r.verified ? '#166534' : '#991B1B', color: 'white' }}>
+                {r.verified ? <Icon.Check /> : <Icon.X />}
+              </div>
+              <p style={{ fontWeight: 800, fontSize: '1rem', color: r.verified ? '#166534' : '#991B1B', margin: '0 0 4px' }}>
+                {r.verified ? 'Cleanup Verified' : 'Insufficient Improvement Detected'}
+              </p>
+              <p style={{ fontSize: '0.875rem', color: T.textMuted, margin: 0 }}>{r.message}</p>
+              {r.verified && r.points_awarded && (
+                <p style={{ fontWeight: 800, fontSize: '1.25rem', color: '#166534', marginTop: 8 }}>+{r.points_awarded} Karma Points Awarded</p>
+              )}
             </div>
-            <div className="grid sm:grid-cols-2 gap-3 text-sm">
-              <div className="bg-accent rounded-xl p-3"><p className="font-medium mb-1">Before</p><p className="text-muted-foreground">{(result as {before_description?:string}).before_description}</p></div>
-              <div className="bg-accent rounded-xl p-3"><p className="font-medium mb-1">After</p><p className="text-muted-foreground">{(result as {after_description?:string}).after_description}</p></div>
+
+            {/* Before / After */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {[{ label: 'Before', desc: r.before_description }, { label: 'After', desc: r.after_description }].map(p => (
+                <div key={p.label} style={{ padding: '0.875rem', border: `1px solid ${T.border}`, borderRadius: 6, background: T.surface }}>
+                  <p style={{ fontWeight: 700, fontSize: '0.75rem', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{p.label}</p>
+                  <p style={{ fontSize: '0.8125rem', color: T.textPrimary, margin: 0, lineHeight: 1.5 }}>{p.desc}</p>
+                </div>
+              ))}
             </div>
-            <div className="bg-accent rounded-xl p-3">
-              <p className="font-medium text-sm mb-2">🔍 Changes Detected</p>
-              <ul className="space-y-1">{((result as {changes_observed?:string[]}).changes_observed||[]).map((c,i) => <li key={i} className="text-sm text-muted-foreground flex gap-2"><span className="text-green-600">✓</span>{c}</li>)}</ul>
-            </div>
-            <div className="text-center text-sm font-medium">Improvement Score: <span className="text-primary text-xl font-black">{(result as {improvement_score?:number}).improvement_score}/100</span></div>
+
+            {/* Changes */}
+            {r.changes_observed && r.changes_observed.length > 0 && (
+              <div style={{ padding: '0.875rem', border: `1px solid ${T.border}`, borderRadius: 6 }}>
+                <p style={{ fontWeight: 600, fontSize: '0.75rem', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Observed Changes</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                  {r.changes_observed.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, fontSize: '0.875rem', color: T.textPrimary }}>
+                      <span style={{ color: T.greenDark, flexShrink: 0 }}><Icon.Check /></span>{c}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {r.improvement_score !== undefined && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.75rem', border: `1px solid ${T.border}`, borderRadius: 6, background: T.surface }}>
+                <span style={{ fontSize: '0.875rem', color: T.textMuted, flexShrink: 0 }}>Improvement Score</span>
+                <div style={{ flex: 1, height: 6, background: T.border, borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${r.improvement_score}%`, background: T.navy, borderRadius: 3, transition: 'width 0.8s ease' }} />
+                </div>
+                <span style={{ fontWeight: 800, fontSize: '1.125rem', color: T.navy, flexShrink: 0 }}>{r.improvement_score}/100</span>
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

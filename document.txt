@@ -5,3 +5,7 @@ AQ.Ab8RN6LjJ1dD119HldVzxxwvw_N7DEabHZILlbRb9PFBOgA5sw
 
 
 open router key GEMINI_API_KEY=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'
+
+git add -A
+git commit -m "Update CleanAir project"
+git push --force origin main

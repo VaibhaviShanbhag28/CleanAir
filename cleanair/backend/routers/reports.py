@@ -1,6 +1,6 @@
 """
 backend/routers/reports.py
-Reports router — CRUD + heatmap + upvote + fake-report detection
+Reports router - CRUD + heatmap + upvote + fake-report detection
 """
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
@@ -31,7 +31,7 @@ async def list_reports(
 async def create_report(data: ReportCreate):
     report_dict = data.model_dump()
 
-    # ── Fake-report gate: block before touching Firestore ─────────────────────
+    # -- Fake-report gate: block before touching Firestore ---------------------
     validation = report_dict.get("validation") or {}
     if validation.get("should_block"):
         raise HTTPException(
@@ -43,7 +43,7 @@ async def create_report(data: ReportCreate):
                 "confidence":       validation.get("confidence", 0),
             },
         )
-    # ─────────────────────────────────────────────────────────────────────────
+    # -------------------------------------------------------------------------
 
     report = await database.create_report(report_dict)
     await database.notify_authorities(report)
