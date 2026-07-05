@@ -1,11 +1,15 @@
 """
 Firestore database service with real Bengaluru seed data.
-Falls back to in-memory store if Firebase is not configured.
+Falls back to a local JSON-backed store if Firebase is not configured, so
+reports/users/karma survive a server restart even without Firebase credentials.
 """
 import uuid
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import json, random
+
+_STORE_FILE = Path(__file__).resolve().parent.parent / ".local_store.json"
 
 _store: Dict[str, List[Dict]] = {
     "reports": [], "users": [], "notifications": [],
@@ -13,6 +17,30 @@ _store: Dict[str, List[Dict]] = {
 }
 _firebase_available = False
 _db = None
+
+
+def _save_store():
+    """Persist the in-memory store to disk (fallback mode only)."""
+    if _firebase_available:
+        return
+    try:
+        _STORE_FILE.write_text(json.dumps(_store, default=str), encoding="utf-8")
+    except Exception as e:
+        print(f"--  Could not persist local store: {e}")
+
+
+def _load_store() -> bool:
+    """Load a previously-persisted store from disk. Returns True if data was loaded."""
+    if not _STORE_FILE.exists():
+        return False
+    try:
+        data = json.loads(_STORE_FILE.read_text(encoding="utf-8"))
+        for key in _store:
+            _store[key] = data.get(key, [])
+        return bool(_store["reports"] or _store["users"])
+    except Exception as e:
+        print(f"--  Could not load local store: {e}")
+        return False
 
 
 def init_firebase(project_id: Optional[str] = None, service_account_key: Optional[str] = None):
@@ -35,9 +63,13 @@ def init_firebase(project_id: Optional[str] = None, service_account_key: Optiona
         _firebase_available = True
         print("- Firebase Firestore connected")
     except Exception as e:
-        print(f"--  Firebase unavailable: {e}. Using in-memory store.")
+        print(f"--  Firebase unavailable: {e}. Using local persistent store ({_STORE_FILE.name}).")
         _firebase_available = False
-        _seed_bengaluru_data()
+        if not _load_store():
+            _seed_bengaluru_data()
+            _save_store()
+        else:
+            print(f"[db] - Restored {len(_store['reports'])} reports, {len(_store['users'])} users from disk")
 
 
 # -- Real Bengaluru seed data --------------------------------------------------
@@ -213,6 +245,7 @@ async def create_report(data: Dict) -> Dict:
         _db.collection("reports").document(rid).set(data)
     else:
         _store["reports"].insert(0, data)
+        _save_store()
     return data
 
 
@@ -253,6 +286,7 @@ async def update_report(rid: str, data: Dict) -> Optional[Dict]:
     for i, r in enumerate(_store["reports"]):
         if r["id"] == rid:
             _store["reports"][i] = {**r, **data}
+            _save_store()
             return _store["reports"][i]
     return None
 
@@ -266,6 +300,7 @@ async def upvote_report(rid: str) -> Optional[Dict]:
     for i, r in enumerate(_store["reports"]):
         if r["id"] == rid:
             _store["reports"][i]["upvotes"] = r.get("upvotes", 0) + 1
+            _save_store()
             return _store["reports"][i]
     return None
 
@@ -295,6 +330,24 @@ async def get_flagged_reports(limit=50) -> List[Dict]:
             (r.get("validation") or {}).get("review_flag") or r.get("status") == "flagged"][:limit]
 
 
+async def get_heatmap_data(time_filter: str = "today") -> List[Dict]:
+    reports = await get_reports(time_filter=time_filter, limit=500)
+    points = []
+    for r in reports:
+        loc = r.get("location") or {}
+        if loc.get("lat") is None or loc.get("lng") is None:
+            continue
+        points.append({
+            "lat":           loc["lat"],
+            "lng":           loc["lng"],
+            "ward":          loc.get("ward"),
+            "severity":      r.get("severity"),
+            "pollutionType": r.get("pollutionType"),
+            "status":        r.get("status"),
+        })
+    return points
+
+
 async def notify_authorities(report: Dict):
     """Store notification for municipal authorities."""
     notif = {
@@ -311,6 +364,7 @@ async def notify_authorities(report: Dict):
         _db.collection("notifications").document(notif["id"]).set(notif)
     else:
         _store["notifications"].insert(0, notif)
+        _save_store()
 
 
 # -- Analytics -----------------------------------------------------------------
@@ -449,6 +503,7 @@ async def add_karma(user_id: str, action: str, points: int = None, description: 
     karma["history"] = [entry] + karma.get("history", [])[:49]
     if action == "report_submitted":
         karma["reportsCount"] = karma.get("reportsCount", 0) + 1
+    _save_store()
     return karma
 
 
@@ -484,6 +539,7 @@ async def create_event(data: Dict) -> Dict:
         _db.collection("events").document(eid).set(event)
     else:
         _store["events"].insert(0, event)
+        _save_store()
     return event
 
 
@@ -499,6 +555,7 @@ async def join_event(event_id: str, user_id: str) -> Dict:
     for i, e in enumerate(_store["events"]):
         if e["id"] == event_id:
             _store["events"][i]["volunteers"] = e.get("volunteers", 0) + 1
+            _save_store()
             return _store["events"][i]
     return {}
 
@@ -512,6 +569,7 @@ async def submit_tip(data: Dict) -> Dict:
         _db.collection("tips").document(tid).set(tip)
     else:
         _store["tips"].insert(0, tip)
+        _save_store()
     return tip
 
 
@@ -541,6 +599,7 @@ async def create_challenge(data: Dict) -> Dict:
         _db.collection("challenges").document(cid).set(ch)
     else:
         _store["challenges"].insert(0, ch)
+        _save_store()
     return ch
 
 
@@ -556,6 +615,7 @@ async def vote_challenge(challenge_id: str) -> Dict:
     for i, c in enumerate(_store["challenges"]):
         if c["id"] == challenge_id:
             _store["challenges"][i]["votes"] = c.get("votes", 0) + 1
+            _save_store()
             return _store["challenges"][i]
     return {}
 
@@ -578,6 +638,7 @@ async def create_diary_entry(data: Dict) -> Dict:
         _db.collection("diary").document(did).set(entry)
     else:
         _store["diary"].insert(0, entry)
+        _save_store()
     return entry
 
 
@@ -646,3 +707,74 @@ async def get_street_score(ward: str) -> Dict:
         "resolutionRate":     rate,
         "trend":              trend,
     }
+
+
+# -- Users & onboarding ----------------------------------------------------------
+
+MUNICIPALITIES = [
+    {
+        "id": "MUN-BBMP",
+        "name": "Bruhat Bengaluru Mahanagara Palike (BBMP)",
+        "city": "Bengaluru", "state": "Karnataka",
+        "wards": BENGALURU_WARDS,
+        "departments": [
+            {"id": "DEP-BBMP-SAN", "name": "Sanitation"},
+            {"id": "DEP-BBMP-SWM", "name": "Solid Waste Management"},
+            {"id": "DEP-BBMP-DRN", "name": "Drainage & Storm Water"},
+            {"id": "DEP-BBMP-RDS", "name": "Roads & Infrastructure"},
+            {"id": "DEP-BBMP-ENV", "name": "Environment"},
+            {"id": "DEP-BBMP-PRK", "name": "Parks & Horticulture"},
+        ],
+    },
+    {
+        "id": "MUN-MCC",
+        "name": "Mangalore City Corporation",
+        "city": "Mangalore", "state": "Karnataka",
+        "wards": ["Kadri", "Bejai", "Attavar", "Kankanady", "Surathkal"],
+        "departments": [
+            {"id": "DEP-MCC-SAN", "name": "Sanitation"},
+            {"id": "DEP-MCC-SWM", "name": "Solid Waste Management"},
+            {"id": "DEP-MCC-DRN", "name": "Drainage"},
+        ],
+    },
+]
+
+
+async def get_municipalities() -> List[Dict]:
+    return MUNICIPALITIES
+
+
+async def get_user_profile(uid: str) -> Optional[Dict]:
+    if _firebase_available and _db:
+        d = _db.collection("users").document(uid).get()
+        return d.to_dict() if d.exists else None
+    return next((u for u in _store["users"] if u.get("uid") == uid), None)
+
+
+async def upsert_user_profile(uid: str, data: Dict) -> Dict:
+    data = {**data, "uid": uid, "updatedAt": datetime.utcnow().isoformat()}
+    if _firebase_available and _db:
+        ref = _db.collection("users").document(uid)
+        existing = ref.get()
+        if existing.exists:
+            ref.update(data)
+        else:
+            ref.set({**data, "createdAt": data["updatedAt"]})
+        return ref.get().to_dict()
+    for i, u in enumerate(_store["users"]):
+        if u.get("uid") == uid:
+            _store["users"][i] = {**u, **data}
+            _save_store()
+            return _store["users"][i]
+    record = {**data, "createdAt": data["updatedAt"]}
+    _store["users"].append(record)
+    _save_store()
+    return record
+
+
+async def find_user_by_aadhaar(aadhaar_hash: str) -> Optional[Dict]:
+    if _firebase_available and _db:
+        q = _db.collection("users").where("aadhaarHash", "==", aadhaar_hash).limit(1)
+        docs = list(q.stream())
+        return docs[0].to_dict() if docs else None
+    return next((u for u in _store["users"] if u.get("aadhaarHash") == aadhaar_hash), None)

@@ -4,6 +4,9 @@
 .env.production
 .env*.local
 
+# Local dev data store (JSON-backed fallback when Firebase isn't configured)
+backend/.local_store.json
+
 # Dependencies
 node_modules/
 __pycache__/

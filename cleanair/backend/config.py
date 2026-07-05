@@ -1,5 +1,8 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
+
+_ENV_FILE = Path(__file__).resolve().parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -25,6 +28,7 @@ class Settings(BaseSettings):
     # Maps / Weather
     GOOGLE_MAPS_KEY:       Optional[str] = None
     OPENWEATHER_API_KEY:   Optional[str] = None
+    WAQI_API_TOKEN:        Optional[str] = None
 
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
@@ -32,12 +36,21 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: Optional[str] = None
 
     # Security
+    AADHAAR_SALT:               str = "cleanair-aadhaar-salt-change-in-prod"
     SECRET_KEY:                 str = "cleanair-secret-change-in-prod"
     ALGORITHM:                  str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
+    # Admin allowlist -- comma-separated emails permitted to onboard as "admin".
+    # Nobody else can obtain this role no matter what the client sends.
+    ADMIN_EMAILS: str = ""
+
+    @property
+    def admin_emails(self) -> list[str]:
+        return [e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()]
+
     class Config:
-        env_file = ".env"
+        env_file = str(_ENV_FILE)
         env_file_encoding = "utf-8"
         extra = "ignore"
 

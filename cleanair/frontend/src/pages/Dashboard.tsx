@@ -237,7 +237,8 @@ export default function Dashboard() {
   const [aiLoading, setAiLoading]      = useState(true);
 
   useEffect(() => {
-    const loadCore = async () => {
+    const loadCore = async (): Promise<number> => {
+      let liveAQI = currentAQI;
       try {
         const [ana, reps, wx] = await Promise.allSettled([
           api.analytics.overview() as Promise<AnalyticsOverview>,
@@ -249,17 +250,21 @@ export default function Dashboard() {
         if (wx.status === 'fulfilled') {
           const wxData = wx.value as { weather?: { temperature?: number; humidity?: number; description?: string }; aqi?: number };
           setWeather(wxData.weather ?? null);
-          if (wxData.aqi) setCurrentAQI(wxData.aqi);
+          if (wxData.aqi) { setCurrentAQI(wxData.aqi); liveAQI = wxData.aqi; }
         }
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
+      return liveAQI;
     };
 
-    const loadAI = async () => {
+    // Advisory must use the freshly-fetched AQI, not the store's stale mount-time
+    // default -- calling it in parallel with loadCore captured whatever currentAQI
+    // was before the real weather/AQI fetch resolved.
+    const loadAI = async (aqi: number) => {
       try {
         const [ins, adv] = await Promise.allSettled([
           api.analytics.aiInsights(),
-          api.ai.horoscope(currentAQI),
+          api.ai.horoscope(aqi),
         ]);
         if (ins.status === 'fulfilled' && ins.value) {
           const raw = ins.value as Record<string, unknown>;
@@ -270,8 +275,7 @@ export default function Dashboard() {
       finally { setAiLoading(false); }
     };
 
-    loadCore();
-    loadAI();
+    loadCore().then(loadAI);
   }, []);
 
   const aqiColor    = getAQIColor(currentAQI);
@@ -328,7 +332,7 @@ export default function Dashboard() {
             {weather && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.625rem' }}>
                 <span style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Icon.Wind /> {weather.temperature?.toFixed(1)}°C &nbsp;·&nbsp; {weather.humidity}% RH &nbsp;·&nbsp; {weather.description}
+                  <Icon.Wind /> {weather.temperature?.toFixed(1)}°C &nbsp;·&nbsp; {weather.humidity?.toFixed(0)}% RH &nbsp;·&nbsp; {weather.description}
                 </span>
               </div>
             )}

@@ -10,6 +10,8 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Pages
 import Dashboard from '@/pages/Dashboard';
+import OnboardingPage from '@/pages/OnboardingPage';
+import RequireRole from '@/components/RequireRole';
 import ReportPage from '@/pages/ReportPage';
 import MapPage from '@/pages/MapPage';
 import KarmaPage from '@/pages/KarmaPage';
@@ -45,14 +47,17 @@ function AppInner() {
     <BrowserRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/report" element={<ReportPage />} />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/karma" element={<KarmaPage />} />
-          <Route path="/community" element={<CommunityPage />} />
-          <Route path="/diary" element={<DiaryPage />} />
-          <Route path="/tools" element={<AIToolsPage />} />
-          <Route path="/municipal" element={<MunicipalPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/" element={<RequireRole><Dashboard /></RequireRole>} />
+          <Route path="/report" element={<RequireRole><ReportPage /></RequireRole>} />
+          <Route path="/map" element={<RequireRole><MapPage /></RequireRole>} />
+          <Route path="/karma" element={<RequireRole><KarmaPage /></RequireRole>} />
+          <Route path="/community" element={<RequireRole><CommunityPage /></RequireRole>} />
+          <Route path="/diary" element={<RequireRole><DiaryPage /></RequireRole>} />
+          <Route path="/tools" element={<RequireRole><AIToolsPage /></RequireRole>} />
+          <Route path="/municipal" element={
+            <RequireRole roles={['authority', 'admin']}><MunicipalPage /></RequireRole>
+          } />
           <Route path="/notifications" element={<NotFoundPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

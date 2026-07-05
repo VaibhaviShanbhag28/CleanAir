@@ -11,6 +11,12 @@ class PollutionType(str, Enum):
     industrial = "industrial"
     vehicle = "vehicle"
     burning_waste = "burning_waste"
+    water_pollution = "water_pollution"
+    noise_pollution = "noise_pollution"
+    chemical_dumping = "chemical_dumping"
+    illegal_dumping = "illegal_dumping"
+    tree_cutting = "tree_cutting"
+    sewage_leakage = "sewage_leakage"
     unknown = "unknown"
 
 
@@ -25,6 +31,7 @@ class ReportStatus(str, Enum):
     acknowledged = "acknowledged"
     in_progress = "in_progress"
     resolved = "resolved"
+    flagged = "flagged"
 
 
 class GeoLocation(BaseModel):

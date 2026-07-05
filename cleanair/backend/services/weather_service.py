@@ -53,6 +53,40 @@ async def get_current_weather(lat: float, lng: float) -> dict:
     }
 
 
+async def get_current_aqi_waqi(lat: float, lng: float) -> Optional[int]:
+    """
+    Get live AQI from the World Air Quality Index project (waqi.info).
+    Their geo-radius search has no station near every coordinate and silently
+    returns whatever is nearest globally (observed returning a Delhi station
+    for Bengaluru coordinates), so we verify the returned city actually is
+    Bengaluru and fall back to the named-city feed otherwise.
+    """
+    if not settings.WAQI_API_TOKEN:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"https://api.waqi.info/feed/geo:{lat};{lng}/",
+                params={"token": settings.WAQI_API_TOKEN},
+            )
+            data = resp.json()
+            if data.get("status") == "ok":
+                city_name = (data["data"].get("city") or {}).get("name", "")
+                if "bengaluru" in city_name.lower() or "bangalore" in city_name.lower():
+                    return data["data"]["aqi"]
+            # Nearest station wasn't actually in Bengaluru -- use the named feed instead.
+            resp = await client.get(
+                "https://api.waqi.info/feed/bangalore/",
+                params={"token": settings.WAQI_API_TOKEN},
+            )
+            data = resp.json()
+            if data.get("status") == "ok":
+                return data["data"]["aqi"]
+    except Exception as e:
+        print(f"WAQI API error: {e}")
+    return None
+
+
 async def get_current_aqi_openweather(lat: float, lng: float) -> Optional[int]:
     """Get current AQI from OpenWeatherMap Air Pollution API."""
     if settings.OPENWEATHER_API_KEY:
@@ -76,6 +110,11 @@ async def get_current_aqi_openweather(lat: float, lng: float) -> Optional[int]:
         except Exception as e:
             print(f"AQI API error: {e}")
     return None
+
+
+async def get_current_aqi(lat: float, lng: float) -> Optional[int]:
+    """Real AQI, preferring WAQI (free token already configured) over OpenWeatherMap."""
+    return await get_current_aqi_waqi(lat, lng) or await get_current_aqi_openweather(lat, lng)
 
 
 def _pm_to_aqi(pm25: float, pm10: float) -> int:
@@ -105,7 +144,7 @@ async def predict_aqi_24h(lat: float, lng: float) -> list[dict]:
     Here we use a physics-informed heuristic.
     """
     weather = await get_current_weather(lat, lng)
-    current_aqi = await get_current_aqi_openweather(lat, lng) or 155
+    current_aqi = await get_current_aqi(lat, lng) or 155
 
     predictions = []
     base_aqi = current_aqi
@@ -154,5 +193,5 @@ async def predict_aqi_24h(lat: float, lng: float) -> list[dict]:
 async def get_weather_and_aqi(lat: float, lng: float) -> dict:
     """Combined weather + AQI endpoint."""
     weather = await get_current_weather(lat, lng)
-    aqi = await get_current_aqi_openweather(lat, lng) or 155
+    aqi = await get_current_aqi(lat, lng) or 155
     return {"weather": weather, "aqi": aqi}

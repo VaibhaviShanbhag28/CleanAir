@@ -2,12 +2,19 @@
 backend/routers/reports.py
 Reports router - CRUD + heatmap + upvote + fake-report detection
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
+from pydantic import BaseModel
 from models.schemas import ReportCreate, ReportUpdate, ResolveRequest
 from services import database, ai_service
+from deps import require_role
+
+
+class AcknowledgeRequest(BaseModel):
+    assigned_to: Optional[str] = None
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+municipal_only = require_role("authority", "admin")
 
 
 @router.get("")
@@ -73,7 +80,7 @@ async def get_report(report_id: str):
 
 
 @router.patch("/{report_id}")
-async def update_report(report_id: str, data: ReportUpdate):
+async def update_report(report_id: str, data: ReportUpdate, _user: dict = Depends(municipal_only)):
     report = await database.update_report(report_id, data.model_dump(exclude_none=True))
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -81,7 +88,7 @@ async def update_report(report_id: str, data: ReportUpdate):
 
 
 @router.post("/{report_id}/resolve")
-async def resolve_report(report_id: str, body: ResolveRequest):
+async def resolve_report(report_id: str, body: ResolveRequest, _user: dict = Depends(municipal_only)):
     from datetime import datetime
     update_data = {
         "status": "resolved",
@@ -91,6 +98,14 @@ async def resolve_report(report_id: str, body: ResolveRequest):
     if body.resolved_image_url:
         update_data["resolvedImageUrl"] = body.resolved_image_url
     report = await database.update_report(report_id, update_data)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+@router.post("/{report_id}/acknowledge")
+async def acknowledge_report(report_id: str, body: AcknowledgeRequest = AcknowledgeRequest(), _user: dict = Depends(municipal_only)):
+    report = await database.acknowledge_report(report_id, assigned_to=body.assigned_to)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     return report

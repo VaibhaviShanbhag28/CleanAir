@@ -10,7 +10,10 @@ from enum import Enum
 from typing import Optional
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-VISION_MODEL   = "google/gemini-2.0-flash-exp:free"
+# Share ai_service's vision chain -- google/gemini-2.0-flash-exp:free was removed
+# from OpenRouter's free catalogue (404s), so this always tries several free
+# alternates before ever touching a paid (credit-requiring) model.
+from services.ai_service import VISION_CHAIN as VISION_MODELS
 
 
 def _get_key() -> str:
@@ -105,44 +108,43 @@ async def validate_image_base64(
     if "," in image_base64:
         image_base64 = image_base64.split(",", 1)[1]
 
-    payload = {
-        "model": VISION_MODEL,
-        "messages": [{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{image_base64}"},
-                },
-                {"type": "text", "text": prompt},
-            ],
-        }],
-        "max_tokens":  400,
-        "temperature": 0.1,
-    }
+    messages = [{
+        "role": "user",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{image_base64}"},
+            },
+            {"type": "text", "text": prompt},
+        ],
+    }]
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(
-                OPENROUTER_URL,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {key}",
-                    "Content-Type":  "application/json",
-                    "HTTP-Referer":  "https://cleanair.app",
-                    "X-Title":       "CleanAir Bengaluru",
-                },
-            )
-            if r.status_code == 200:
-                text = r.json()["choices"][0]["message"]["content"]
-                cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
-                raw = json.loads(cleaned)
-                print(f"[validation_service] success: {raw.get('recommended_action')} confidence={raw.get('confidence')}")
-                return _interpret(raw, has_gps)
-            else:
-                print(f"[validation_service] OpenRouter error {r.status_code}: {r.text[:150]}")
-    except Exception as e:
-        print(f"[validation_service] error: {e}")
+    for model in VISION_MODELS:
+        payload = {"model": model, "messages": messages, "max_tokens": 400, "temperature": 0.1}
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                r = await client.post(
+                    OPENROUTER_URL,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type":  "application/json",
+                        "HTTP-Referer":  "https://cleanair.app",
+                        "X-Title":       "CleanAir Bengaluru",
+                    },
+                )
+                if r.status_code == 200:
+                    text = r.json()["choices"][0]["message"]["content"]
+                    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+                    raw = json.loads(cleaned)
+                    print(f"[validation_service] {model} success: {raw.get('recommended_action')} confidence={raw.get('confidence')}")
+                    return _interpret(raw, has_gps)
+                else:
+                    print(f"[validation_service] {model} error {r.status_code}: {r.text[:150]} -- trying next")
+                    continue
+        except Exception as e:
+            print(f"[validation_service] {model}: {e} -- trying next")
+            continue
 
     return _error_result(has_gps)
 

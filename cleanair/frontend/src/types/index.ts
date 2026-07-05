@@ -173,4 +173,34 @@ export interface User {
   role: UserRole;
   ward?: string;
   karmaScore?: number;
+  /** false until the role/Aadhaar onboarding wizard is completed */
+  onboarded?: boolean;
+  verifiedName?: string;
+  aadhaarLast4?: string;
+  municipalityId?: string;
+  municipalityName?: string;
+  departmentId?: string;
+  departmentName?: string;
+  designation?: string;
+  employeeId?: string;
+}
+
+export interface Municipality {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  wards: string[];
+  departments: { id: string; name: string }[];
+}
+
+export interface OnboardPayload {
+  role: 'citizen' | 'authority' | 'admin';
+  aadhaarNumber: string;
+  fullName: string;
+  ward?: string;
+  municipalityId?: string;
+  departmentId?: string;
+  designation?: string;
+  employeeId?: string;
 }

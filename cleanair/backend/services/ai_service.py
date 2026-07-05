@@ -11,12 +11,29 @@ from datetime import datetime
 
 OPENROUTER_URL  = "https://openrouter.ai/api/v1/chat/completions"
 
-# Confirmed live free models (verified July 2026)
-VISION_MODEL    = "nvidia/nemotron-nano-12b-v2-vl:free"
-TEXT_MODEL      = "meta-llama/llama-3.3-70b-instruct:free"
-FALLBACK_TEXT   = "google/gemma-4-31b-it:free"
-FALLBACK_TEXT2  = "google/gemma-4-26b-a4b-it:free"
-LAST_RESORT     = "openrouter/auto"   # always works -- OpenRouter picks best available
+# Verified live free models on OpenRouter (checked against /api/v1/models, July 2026).
+# Each free model has its own independent daily quota, so trying several in a row
+# before ever touching a paid model dramatically cuts how often a request falls
+# back to canned text -- this account has no purchased credits, so the paid
+# entries at the end of each chain will 402 until credits are added.
+VISION_CHAIN = [
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "google/gemini-2.5-flash-lite",   # paid fallback -- needs OpenRouter credits
+    "openrouter/auto",                # paid fallback -- needs OpenRouter credits
+]
+TEXT_CHAIN = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "openai/gpt-oss-20b:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "openrouter/auto",                # paid fallback -- needs OpenRouter credits
+]
 
 
 # -- Key resolution ------------------------------------------------------------
@@ -36,15 +53,26 @@ def _get_key() -> str:
 # -- Core OpenRouter caller ----------------------------------------------------
 
 async def _call_openrouter(messages: list, max_tokens: int = 600) -> str | None:
+    text, _ = await _call_openrouter_detailed(messages, max_tokens)
+    return text
+
+
+async def _call_openrouter_detailed(messages: list, max_tokens: int = 600) -> tuple[str | None, bool]:
     """
     Call OpenRouter with automatic fallback through the model chain.
     Detects vision requests automatically from message content.
     Always ends with openrouter/auto which never 404s.
+
+    Returns (text, quota_exhausted). quota_exhausted=True means every model in
+    the chain was rejected specifically for OpenRouter's account-wide daily
+    free-tier cap ("free-models-per-day") rather than a transient per-model
+    rate limit -- callers can surface an honest "try again tomorrow or add
+    credits" message instead of a generic "AI unavailable" one.
     """
     key = _get_key()
     if not key:
         print("[ai] No API key -- set OPENROUTER_API_KEY in .env")
-        return None
+        return None, False
 
     headers = {
         "Authorization": f"Bearer {key}",
@@ -59,10 +87,13 @@ async def _call_openrouter(messages: list, max_tokens: int = 600) -> str | None:
         for m in messages
     )
 
-    if has_image:
-        chain = [VISION_MODEL, LAST_RESORT]
-    else:
-        chain = [TEXT_MODEL, FALLBACK_TEXT, FALLBACK_TEXT2, LAST_RESORT]
+    chain = VISION_CHAIN if has_image else TEXT_CHAIN
+    # True if ANY model reported OpenRouter's account-wide daily free-tier cap --
+    # other models in the same chain often fail for an unrelated reason (their
+    # own independent global rate limit), so requiring *all* of them to show
+    # this exact message under-detects the case that's actually fixable by
+    # adding credits.
+    daily_quota_hit = False
 
     for model in chain:
         payload = {
@@ -81,27 +112,32 @@ async def _call_openrouter(messages: list, max_tokens: int = 600) -> str | None:
             if r.status_code == 200:
                 text = r.json()["choices"][0]["message"]["content"]
                 print(f"[ai]   {model} ({len(text)} chars)")
-                return text
+                return text, False
 
-            if r.status_code in (404, 429):
-                print(f"[ai] {r.status_code} on {model} -- trying next")
-                continue
+            if "free-models-per-day" in r.text:
+                daily_quota_hit = True
 
-            print(f"[ai]   {r.status_code} ({model}): {r.text[:120]}")
-            return None   # non-retryable error
+            # Any upstream error: log and try the next model in the chain
+            print(f"[ai] {r.status_code} on {model}: {r.text[:120]} -- trying next")
+            continue
 
         except Exception as e:
             print(f"[ai]     {model}: {e} -- trying next")
             continue
 
-    print("[ai]   All models exhausted")
-    return None
+    print(f"[ai]   All models exhausted (daily quota hit: {daily_quota_hit})")
+    return None, daily_quota_hit
 
 
 def _clean_json(text: str | None) -> str:
-    """Strip markdown fences and leading/trailing whitespace from JSON."""
+    """
+    Strip markdown fences and leading/trailing whitespace from JSON.
+    Raises on empty input so callers' `except: <fallback>` blocks actually
+    fire when every model in the chain failed (text is None) -- returning
+    "{}" here would parse successfully and silently skip the fallback.
+    """
     if not text:
-        return "{}"
+        raise ValueError("empty AI response")
     return re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
 
 
@@ -334,8 +370,17 @@ Location: {user_location}
     chat = [{"role": "system", "content": system}] + [
         {"role": m["role"], "content": m["content"]} for m in messages[-14:]
     ]
-    text = await _call_openrouter(chat, max_tokens=550)
-    return text or (
+    text, quota_exhausted = await _call_openrouter_detailed(chat, max_tokens=550)
+    if text:
+        return text
+    if quota_exhausted:
+        return (
+            "The AI assistant has used up today's free quota on our AI provider. "
+            "It resets automatically -- please try again in a few hours, or ask "
+            "the platform admin to add OpenRouter credits for uninterrupted service. "
+            "For urgent environmental issues, call BBMP Control Room: 080-2222-1188."
+        )
+    return (
         "I'm having trouble connecting to the AI service right now. "
         "For urgent environmental issues please call BBMP Control Room: 080-2222-1188. "
         "You can also check the live Dashboard for current AQI data."
@@ -514,29 +559,39 @@ Return ONLY valid JSON with exact calculations:
 "trees_to_offset":calculated_value,
 "equivalent":"relatable comparison (e.g. driving X km)"}}"""
 
+    # Compute deterministically -- free LLMs are unreliable at arithmetic
+    # (observed totalCO2 not matching the sum of their own breakdown), so the
+    # numeric fields are always authoritative; only qualitative text is AI-generated.
+    t_factors = {"walk":0,"cycle":0,"metro":0.031,"bus":0.089,"auto":0.1,"bike":0.113,"car":0.192}
+    t_co2  = round(t_factors.get(transport, 0.089) * distance * 365)
+    e_co2  = round(elec * 12 * 0.82)
+    lpg_co2= round(lpg * 12 * 2.98 * 14.2)
+    d_co2  = round(meat * 52 * 3.3)
+    a_co2  = round(flights * 255)
+    total  = t_co2 + e_co2 + lpg_co2 + d_co2 + a_co2
+    rating = "excellent" if total<800 else "good" if total<1500 else "average" if total<2500 else "high" if total<4000 else "very_high"
+    computed = {
+        "totalCO2": total,
+        "breakdown": {"transport":t_co2,"electricity":e_co2,"cooking":lpg_co2,"diet":d_co2,"aviation":a_co2},
+        "rating": rating,
+        "comparison": f"India average: 1,900 kg/yr | Global average: 4,700 kg/yr | Your footprint: {total} kg/yr",
+        "tips": ["Switch to Namma Metro/BMTC for daily commute",
+                 "Install solar panels (BESCOM offers subsidies up to Rs78,000)",
+                 "Use induction cooktop instead of LPG",
+                 "Reduce meat consumption to 1-2 meals/week"],
+        "trees_to_offset": max(1, total // 22),
+        "equivalent": f"Driving {round(total/0.192):,} km by car",
+    }
+
     text = await _call_openrouter([{"role": "user", "content": prompt}], max_tokens=600)
     try:
-        return json.loads(_clean_json(text))
+        ai = json.loads(_clean_json(text))
+        # Keep the AI's qualitative writing, but never trust its arithmetic.
+        computed["tips"] = ai.get("tips") or computed["tips"]
+        computed["equivalent"] = ai.get("equivalent") or computed["equivalent"]
     except Exception:
-        # Fallback calculation using Indian emission factors
-        t_factors = {"walk":0,"cycle":0,"metro":0.031,"bus":0.089,"auto":0.1,"bike":0.113,"car":0.192}
-        t_co2  = round(t_factors.get(transport, 0.089) * distance * 365)
-        e_co2  = round(elec * 12 * 0.82)
-        lpg_co2= round(lpg * 12 * 2.98 * 14.2)
-        d_co2  = round(meat * 52 * 3.3)
-        a_co2  = round(flights * 255)
-        total  = t_co2 + e_co2 + lpg_co2 + d_co2 + a_co2
-        rating = "excellent" if total<800 else "good" if total<1500 else "average" if total<2500 else "high" if total<4000 else "very_high"
-        return {"totalCO2": total,
-                "breakdown": {"transport":t_co2,"electricity":e_co2,"cooking":lpg_co2,"diet":d_co2,"aviation":a_co2},
-                "rating": rating,
-                "comparison": f"India average: 1,900 kg/yr | Global average: 4,700 kg/yr | Your footprint: {total} kg/yr",
-                "tips": ["Switch to Namma Metro/BMTC for daily commute",
-                         "Install solar panels (BESCOM offers subsidies up to Rs78,000)",
-                         "Use induction cooktop instead of LPG",
-                         "Reduce meat consumption to 1-2 meals/week"],
-                "trees_to_offset": max(1, total // 22),
-                "equivalent": f"Driving {round(total/0.192):,} km by car"}
+        pass
+    return computed
 
 
 # -- Diary summary -------------------------------------------------------------

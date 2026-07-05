@@ -1,3 +1,6 @@
+import { auth } from '@/lib/firebase';
+import type { Municipality, OnboardPayload, User } from '@/types';
+
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
@@ -12,8 +15,27 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/** Authenticated request — attaches the current Firebase ID token. */
+async function authedReq<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw { detail: 'Not signed in' };
+  return req<T>(path, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, ...options?.headers },
+  });
+}
+
 // ── Reports ──────────────────────────────────────────────────────────────────
 export const api = {
+  auth: {
+    me: () => authedReq<User & { onboarded: boolean }>('/auth/me'),
+    onboard: (payload: OnboardPayload) =>
+      authedReq<{ onboarded: boolean; role: string; verifiedName: string; aadhaarLast4: string }>(
+        '/auth/onboard', { method: 'POST', body: JSON.stringify(payload) }),
+    municipalities: () => req<Municipality[]>('/municipalities'),
+    adminEligible: () => authedReq<{ eligible: boolean }>('/auth/admin-eligible'),
+  },
+
   reports: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -21,12 +43,12 @@ export const api = {
     },
     get: (id: string) => req<unknown>(`/reports/${id}`),
     create: (data: unknown) => req<unknown>('/reports', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: unknown) => req<unknown>(`/reports/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) => authedReq<unknown>(`/reports/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     resolve: (id: string, note: string, imageUrl?: string) =>
-      req<unknown>(`/reports/${id}/resolve`, { method: 'POST', body: JSON.stringify({ note, resolved_image_url: imageUrl }) }),
+      authedReq<unknown>(`/reports/${id}/resolve`, { method: 'POST', body: JSON.stringify({ note, resolved_image_url: imageUrl }) }),
     upvote: (id: string) => req<unknown>(`/reports/${id}/upvote`, { method: 'POST' }),
     acknowledge: (id: string, assignedTo?: string) =>
-      req<unknown>(`/reports/${id}/acknowledge`, { method: 'POST', body: JSON.stringify({ assigned_to: assignedTo }) }),
+      authedReq<unknown>(`/reports/${id}/acknowledge`, { method: 'POST', body: JSON.stringify({ assigned_to: assignedTo }) }),
     heatmap: (timeFilter = 'today') => req<unknown[]>(`/reports/heatmap?time_filter=${timeFilter}`),
     flagged: () => req<unknown[]>('/reports/flagged'),
   },

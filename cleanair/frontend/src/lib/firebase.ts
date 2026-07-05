@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -18,7 +18,19 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    // Popups are blocked by many browsers/extensions by default -- fall back
+    // to a full-page redirect flow instead of leaving the user stuck.
+    if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return signInWithRedirect(auth, googleProvider);
+    }
+    throw err;
+  }
+};
 export const signOutUser = () => signOut(auth);
 export { onAuthStateChanged };
 export type { User };
