@@ -122,7 +122,7 @@ const primaryBtn = (disabled = false): React.CSSProperties => ({
   fontWeight: 600, fontSize: '0.8125rem',
   cursor: disabled ? 'not-allowed' : 'pointer',
   transition: 'all 0.15s', letterSpacing: '0.01em',
-  width: '100%', 
+  width: '100%',
 });
 const outlineBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -267,74 +267,224 @@ export default function AIToolsPage() {
 }
 
 // ── Waste Classifier ──────────────────────────────────────────────────────────
+// ── Waste Classifier ──────────────────────────────────────────────────────────
 function WasteClassifier() {
   const [image, setImage]     = useState('');
   const [preview, setPreview] = useState('');
   const [result, setResult]   = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
     const b64 = await imageToBase64(f);
-    setPreview(b64); setImage(b64); setResult(null);
+    setPreview(b64);
+    setImage(b64);
+    setResult(null);
+    setError('');
   };
 
   const classify = async () => {
     if (!image) return;
     setLoading(true);
-    try { setResult(await api.ai.classifyWaste(image) as Record<string, unknown>); }
-    catch { toast('Classification failed. Please try again.', 'error'); }
-    finally { setLoading(false); }
+    setError('');
+    setResult(null);
+    try {
+      const res = await api.ai.classifyWaste(image) as Record<string, unknown>;
+      setResult(res);
+    } catch (e) {
+      setError('Classification failed. Please try again.');
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const r = result as { bin_color?: string; primary_category?: string; is_recyclable?: boolean; segregation_tip?: string; environmental_note?: string; items?: { name: string; category: string; disposal: string }[] } | null;
-  const BIN_HEX: Record<string, string> = { green: '#166534', blue: '#1E40AF', red: '#991B1B', black: '#111827' };
+  const r = result as {
+    bin_color?: string;
+    primary_category?: string;
+    is_recyclable?: boolean;
+    segregation_tip?: string;
+    environmental_note?: string;
+    confidence?: number;
+    items?: { name: string; category: string; disposal: string }[];
+  } | null;
+
+  const BIN_HEX: Record<string, string> = {
+    green: '#166534',
+    blue:  '#1E40AF',
+    red:   '#991B1B',
+    black: '#111827',
+  };
 
   return (
     <div style={sectionCard}>
       <div style={sectionHeader}>
         <div style={{ color: T.navy }}><Icon.Recycle /></div>
         <div>
-          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>Waste Segregation Classifier</p>
-          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>Upload a photo — AI identifies the waste type and correct disposal bin</p>
+          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>
+            Waste Segregation Classifier
+          </p>
+          <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>
+            Upload a photo -- AI identifies the waste type and correct disposal bin
+          </p>
         </div>
       </div>
-      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <UploadZone preview={preview} label="Upload Waste Photo" onClick={() => fileRef.current?.click()} />
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
 
+      <div style={{ ...sectionBody, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+        {/* Upload zone */}
+        <div
+          onClick={() => fileRef.current?.click()}
+          style={{
+            border: `1.5px dashed ${preview ? T.navy : T.border}`,
+            borderRadius: 6,
+            padding: '1.5rem',
+            textAlign: 'center',
+            cursor: 'pointer',
+            background: preview ? `${T.navy}05` : T.surface,
+            transition: 'all 0.15s',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.75rem',
+          }}
+        >
+          {preview ? (
+            <img
+              src={preview}
+              alt="Waste preview"
+              style={{
+                maxHeight: 200,
+                maxWidth: '100%',
+                borderRadius: 4,
+                objectFit: 'contain',
+                display: 'block',
+              }}
+            />
+          ) : (
+            <>
+              <div style={{ color: T.textMuted }}><Icon.Upload /></div>
+              <p style={{ fontWeight: 600, fontSize: '0.875rem', color: T.textPrimary, margin: 0 }}>
+                Click to upload waste photo
+              </p>
+              <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: 0 }}>
+                JPG, PNG -- max 10 MB
+              </p>
+            </>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleFile}
+          />
+        </div>
+
+        {/* Classify button -- always visible when image selected */}
         {preview && (
-          <button style={primaryBtn(loading)} onClick={classify} disabled={loading}>
-            {loading ? <><Spin /> Classifying...</> : 'Run AI Classification'}
+          <button
+            onClick={classify}
+            disabled={loading}
+            style={{
+              ...primaryBtn(loading),
+              padding: '0.625rem 1.25rem',
+              fontSize: '0.9rem',
+              width: '100%',
+            }}
+          >
+            {loading ? (
+              <>
+                <span style={{
+                  width: 16, height: 16,
+                  border: '2px solid white',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'spin 0.7s linear infinite',
+                }} />
+                Classifying...
+              </>
+            ) : (
+              'Run AI Classification'
+            )}
           </button>
         )}
 
+        {/* Error */}
+        {error && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            background: '#FFF5F5',
+            border: '1px solid #FECACA',
+            borderRadius: 6,
+            fontSize: '0.875rem',
+            color: '#991B1B',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Results */}
         {r && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            {/* Result header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6 }}>
+
+            {/* Bin result header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              padding: '1rem',
+              background: T.surface,
+              border: `1px solid ${T.border}`,
+              borderRadius: 6,
+            }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 6, flexShrink: 0,
+                width: 52,
+                height: 52,
+                borderRadius: 8,
+                flexShrink: 0,
                 background: BIN_HEX[r.bin_color || 'blue'] || '#1E40AF',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'white', fontWeight: 800, fontSize: '1.125rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 800,
+                fontSize: '1.25rem',
               }}>
                 {(r.bin_color || 'B')[0].toUpperCase()}
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0, textTransform: 'capitalize' }}>
+                <p style={{
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  color: T.textPrimary,
+                  margin: '0 0 3px',
+                  textTransform: 'capitalize',
+                }}>
                   {r.primary_category} Waste
                 </p>
-                <p style={{ fontSize: '0.8125rem', color: T.textMuted, margin: '2px 0 0', textTransform: 'capitalize' }}>
-                  Dispose in the {r.bin_color} bin
+                <p style={{ fontSize: '0.8125rem', color: T.textMuted, margin: 0, textTransform: 'capitalize' }}>
+                  Dispose in the <strong>{r.bin_color}</strong> bin
                 </p>
+                {r.confidence !== undefined && (
+                  <p style={{ fontSize: '0.75rem', color: T.textMuted, margin: '2px 0 0' }}>
+                    Confidence: {Math.round((r.confidence || 0) * 100)}%
+                  </p>
+                )}
               </div>
               <span style={{
-                padding: '0.2rem 0.6rem', borderRadius: 3, fontSize: '0.75rem', fontWeight: 700,
+                padding: '0.2rem 0.65rem',
+                borderRadius: 3,
+                fontSize: '0.75rem',
+                fontWeight: 700,
                 background: r.is_recyclable ? '#F0FDF4' : '#FFFBEB',
-                color: r.is_recyclable ? '#166534' : '#92400E',
-                border: `1px solid ${r.is_recyclable ? '#BBF7D0' : '#FDE68A'}`,
+                color:      r.is_recyclable ? '#166534' : '#92400E',
+                border:     `1px solid ${r.is_recyclable ? '#BBF7D0' : '#FDE68A'}`,
+                flexShrink: 0,
               }}>
                 {r.is_recyclable ? 'Recyclable' : 'Non-recyclable'}
               </span>
@@ -342,33 +492,113 @@ function WasteClassifier() {
 
             {/* Segregation tip */}
             {r.segregation_tip && (
-              <div style={{ padding: '0.875rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6 }}>
-                <p style={{ fontWeight: 700, fontSize: '0.75rem', color: '#1E40AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Disposal Guidance</p>
-                <p style={{ fontSize: '0.875rem', color: '#1E3A8A', margin: 0, lineHeight: 1.5 }}>{r.segregation_tip}</p>
+              <div style={{
+                padding: '0.875rem',
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                borderRadius: 6,
+              }}>
+                <p style={{
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  color: '#1E40AF',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  margin: '0 0 4px',
+                }}>
+                  Disposal Guidance
+                </p>
+                <p style={{ fontSize: '0.875rem', color: '#1E3A8A', margin: 0, lineHeight: 1.5 }}>
+                  {r.segregation_tip}
+                </p>
               </div>
             )}
 
-            {/* Item breakdown */}
+            {/* Items detected */}
             {r.items && r.items.length > 0 && (
-              <div style={{ border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
-                <div style={{ padding: '0.5rem 0.875rem', background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                  <p style={{ fontWeight: 600, fontSize: '0.75rem', color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Items Detected</p>
+              <div style={{
+                border: `1px solid ${T.border}`,
+                borderRadius: 6,
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '0.5rem 0.875rem',
+                  background: T.surface,
+                  borderBottom: `1px solid ${T.border}`,
+                }}>
+                  <p style={{
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: T.textMuted,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    margin: 0,
+                  }}>
+                    Items Detected
+                  </p>
                 </div>
                 {r.items.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.875rem', borderBottom: i < r.items!.length - 1 ? `1px solid ${T.border}` : 'none' }}>
-                    <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: T.textPrimary }}>{item.name}</span>
-                    <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.45rem', background: '#EFF6FF', color: '#1E40AF', border: '1px solid #BFDBFE', borderRadius: 3, textTransform: 'capitalize' }}>{item.category}</span>
-                    <span style={{ fontSize: '0.75rem', color: T.textMuted }}>{item.disposal}</span>
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.625rem 0.875rem',
+                    borderBottom: i < r.items!.length - 1 ? `1px solid ${T.border}` : 'none',
+                  }}>
+                    <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: T.textPrimary }}>
+                      {item.name}
+                    </span>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      padding: '0.1rem 0.45rem',
+                      background: '#EFF6FF',
+                      color: '#1E40AF',
+                      border: '1px solid #BFDBFE',
+                      borderRadius: 3,
+                      textTransform: 'capitalize',
+                    }}>
+                      {item.category}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: T.textMuted }}>
+                      {item.disposal}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
+            {/* Environmental note */}
             {r.environmental_note && (
-              <div style={{ padding: '0.75rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6, fontSize: '0.8125rem', color: '#166534' }}>
+              <div style={{
+                padding: '0.75rem',
+                background: '#F0FDF4',
+                border: '1px solid #BBF7D0',
+                borderRadius: 6,
+                fontSize: '0.875rem',
+                color: '#166534',
+                lineHeight: 1.5,
+              }}>
                 {r.environmental_note}
               </div>
             )}
+
+            {/* Try another */}
+            <button
+              onClick={() => { setPreview(''); setImage(''); setResult(null); setError(''); }}
+              style={{
+                background: 'none',
+                border: `1.5px solid ${T.border}`,
+                borderRadius: 4,
+                padding: '0.5rem 1rem',
+                fontSize: '0.8125rem',
+                color: T.textMuted,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                alignSelf: 'flex-start',
+              }}
+            >
+              Classify another image
+            </button>
           </div>
         )}
       </div>
@@ -376,7 +606,7 @@ function WasteClassifier() {
   );
 }
 
-// ── Carbon Calculator ─────────────────────────────────────────────────────────
+
 function CarbonCalculator() {
   const [form, setForm] = useState({ transportMode: 'bus', distanceKm: 10, electricityKwh: 100, lpgCylinders: 1, meatMealsPerWeek: 3, flightsPerYear: 1 });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);

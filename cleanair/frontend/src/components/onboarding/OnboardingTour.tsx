@@ -1,337 +1,287 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Sparkles, Rss, FileEdit, Map, Trophy, Users, Wrench, MessageCircle, Building2,
-  ChevronLeft, ChevronRight, Check, X, type LucideIcon,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store';
 
 const T = {
-  navy: '#0A2240', navyDark: '#071829', green: '#166534', border: '#DDE2EA',
-  textPrimary: '#0D1B2A', textMuted: '#4A5568', card: '#FFFFFF',
+  navy:      '#0A2240',
+  border:    '#DDE2EA',
+  surface:   '#F5F7FA',
+  textPrimary:'#0D1B2A',
+  textMuted: '#4A5568',
+  card:      '#FFFFFF',
+  greenDark: '#166534',
 };
 
 interface TourStep {
-  selector: string | null;
-  title: string;
-  body: string;
-  icon: LucideIcon;
-  accent: string;
+  title:    string;
+  desc:     string;
+  target:   string;   // CSS selector of highlighted element
+  position: 'top' | 'bottom' | 'left' | 'right' | 'center';
 }
 
-const CITIZEN_STEPS: TourStep[] = [
-  { selector: null, icon: Sparkles, accent: '#0A2240', title: 'Welcome to CleanAir 👋', body: 'Here\'s a 30-second tour of what you can do here.' },
-  { selector: '[data-tour="dashboard-feed"]', icon: Rss, accent: '#1E40AF', title: 'Community Feed', body: 'Every report from citizens and municipality staff shows up here, live.' },
-  { selector: '[data-tour="nav-report"]', icon: FileEdit, accent: '#B91C1C', title: 'Submit a Report', body: 'Spotted pollution? Tap here to report it with a photo and instant AI analysis.' },
-  { selector: '[data-tour="nav-map"]', icon: Map, accent: '#6D28D9', title: 'Live Incident Map', body: 'See every reported incident plotted on a map of the city.' },
-  { selector: '[data-tour="nav-karma"]', icon: Trophy, accent: '#B45309', title: 'Karma & Leaderboard', body: 'Earn points for reporting and resolving issues, and climb the leaderboard.' },
-  { selector: '[data-tour="nav-community"]', icon: Users, accent: '#166534', title: 'Community', body: 'Join local cleanup drives and environmental challenges.' },
-  { selector: '[data-tour="nav-tools"]', icon: Wrench, accent: '#0369A1', title: 'AI Tools', body: 'Handy AI tools for waste sorting, carbon footprint, and more.' },
-  { selector: '[data-tour="chatbot"]', icon: MessageCircle, accent: '#0A2240', title: 'Ask CleanAir AI', body: 'Stuck? Our assistant is one click away, anytime.' },
+const STEPS: TourStep[] = [
+  {
+    title:    'Welcome to CleanAir',
+    desc:     'This is your command centre for Bengaluru environmental monitoring. Let\'s take a quick tour.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'Live AQI',
+    desc:     'The AQI pill in the navbar shows Bengaluru\'s real-time air quality. Green is good, red means wear your N95.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'Submit a Report',
+    desc:     'Spotted garbage burning, illegal dumping, or industrial smoke? Hit "Report" to file an incident in 5 steps. AI verifies your photo automatically.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'Incident Registry',
+    desc:     'All citizen reports are logged here with status tracking. Filter by severity, ward, or pollution type.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'Earn Karma Points',
+    desc:     'Every verified report, diary entry, and eco action earns Karma. Climb from Seedling to Planet Protector on the city leaderboard.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'Community Hub',
+    desc:     'Join cleanup drives, plantation events, and submit confidential tips about violations -- your identity stays fully protected.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'AI Intelligence Suite',
+    desc:     'Six AI tools: waste classifier, carbon calculator, official notice generator, air advisory, seasonal forecast, and cleanup verifier.',
+    target:   '',
+    position: 'center',
+  },
+  {
+    title:    'Ask CleanAir AI',
+    desc:     'The AI assistant in the bottom-right corner knows everything about this platform, Bengaluru\'s air quality, BBMP processes, and eco tips. Ask it anything.',
+    target:   '',
+    position: 'center',
+  },
 ];
 
-const MUNICIPALITY_STEPS: TourStep[] = [
-  { selector: null, icon: Sparkles, accent: '#0A2240', title: 'Welcome to CleanAir 👋', body: 'Here\'s a 30-second tour of your municipality dashboard.' },
-  { selector: '[data-tour="nav-municipal"]', icon: Building2, accent: '#0A2240', title: 'Municipal Dashboard', body: 'Review every report submitted by citizens and act on them from here.' },
-  { selector: '[data-tour="nav-map"]', icon: Map, accent: '#6D28D9', title: 'Live Incident Map', body: 'See every reported incident plotted on a map of the city.' },
-  { selector: '[data-tour="nav-community"]', icon: Users, accent: '#166534', title: 'Community', body: 'See cleanup drives and challenges happening across the city.' },
-  { selector: '[data-tour="nav-tools"]', icon: Wrench, accent: '#0369A1', title: 'AI Tools', body: 'Handy AI tools to help draft notices and analyse reports.' },
-  { selector: '[data-tour="chatbot"]', icon: MessageCircle, accent: '#0A2240', title: 'Ask CleanAir AI', body: 'Stuck? Our assistant is one click away, anytime.' },
-];
-
-const TOOLTIP_WIDTH = 336;
-const SPOTLIGHT_PAD = 8;
-const ARROW_SIZE = 11;
-
-function useTargetRect(selector: string | null, active: boolean) {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-
-  useEffect(() => {
-    if (!active || !selector) { setRect(null); return; }
-    const update = () => {
-      const el = document.querySelector(selector);
-      setRect(el ? el.getBoundingClientRect() : null);
-    };
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    const interval = setInterval(update, 300); // catches layout shifts as data loads
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-      clearInterval(interval);
-    };
-  }, [selector, active]);
-
-  return rect;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const n = parseInt(hex.replace('#', ''), 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  return `rgba(${r},${g},${b},${alpha})`;
-}
+const TOUR_KEY = 'cleanair_tour_done';
 
 export default function OnboardingTour() {
-  const { user, authReady } = useAppStore();
-  const [active, setActive] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [direction, setDirection] = useState<1 | -1>(1);
-  const [closing, setClosing] = useState(false);
-  const skipRef = useRef<() => void>(() => {});
-
-  const steps = useMemo(
-    () => (user?.role === 'authority' || user?.role === 'admin' ? MUNICIPALITY_STEPS : CITIZEN_STEPS),
-    [user?.role],
-  );
+  const { user } = useAppStore();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const [step, setStep]     = useState(0);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!authReady || !user || !user.onboarded) return;
-    const key = `cleanair.tourSeen.${user.uid}`;
-    if (localStorage.getItem(key)) return;
-    setStepIndex(0);
-    const t = setTimeout(() => setActive(true), 700); // let the dashboard finish rendering first
-    return () => clearTimeout(t);
-  }, [authReady, user]);
+    // Show tour only on dashboard, only if not already seen
+    if (location.pathname !== '/') return;
+    const done = localStorage.getItem(TOUR_KEY);
+    if (!done) {
+      const t = setTimeout(() => setVisible(true), 800);
+      return () => clearTimeout(t);
+    }
+  }, [location.pathname]);
 
-  const step = steps[stepIndex];
-  const rect = useTargetRect(step?.selector ?? null, active);
-
-  const finish = () => {
-    setClosing(true);
-    setTimeout(() => {
-      if (user) localStorage.setItem(`cleanair.tourSeen.${user.uid}`, '1');
-      setActive(false);
-      setClosing(false);
-    }, 200);
+  const dismiss = () => {
+    localStorage.setItem(TOUR_KEY, '1');
+    setVisible(false);
   };
-  skipRef.current = finish;
 
   const next = () => {
-    if (stepIndex < steps.length - 1) { setDirection(1); setStepIndex((i) => i + 1); }
-    else finish();
+    if (step < STEPS.length - 1) {
+      setStep(s => s + 1);
+    } else {
+      dismiss();
+      navigate('/');
+    }
   };
-  const prev = () => { setDirection(-1); setStepIndex((i) => Math.max(0, i - 1)); };
 
-  // Keyboard navigation while the tour is active
-  useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') skipRef.current();
-      if (e.key === 'ArrowRight' || e.key === 'Enter') next();
-      if (e.key === 'ArrowLeft') prev();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, stepIndex]);
+  const prev = () => {
+    if (step > 0) setStep(s => s - 1);
+  };
 
-  if (!active || !step) return null;
+  if (!visible) return null;
 
-  const accent = step.accent;
-  const spaceBelow = rect ? window.innerHeight - rect.bottom : 0;
-  const placeAbove = !!rect && spaceBelow < 240;
-  const tooltipTop = rect
-    ? placeAbove ? rect.top - SPOTLIGHT_PAD - 16 : rect.bottom + SPOTLIGHT_PAD + 16
-    : window.innerHeight / 2;
-  const tooltipLeft = rect
-    ? Math.min(Math.max(rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2, 16), window.innerWidth - TOOLTIP_WIDTH - 16)
-    : window.innerWidth / 2 - TOOLTIP_WIDTH / 2;
-  const arrowLeft = rect
-    ? Math.min(Math.max(rect.left + rect.width / 2 - tooltipLeft - ARROW_SIZE / 2, 18), TOOLTIP_WIDTH - 18 - ARROW_SIZE)
-    : null;
-
-  const Icon = step.icon;
-  const progressPct = ((stepIndex + 1) / steps.length) * 100;
-  const slideAnim = closing
-    ? 'cleanair-tour-out 0.2s ease forwards'
-    : `cleanair-tour-${direction === 1 ? 'in-right' : 'in-left'} 0.3s cubic-bezier(.22,1,.36,1)`;
+  const current = STEPS[step];
+  const isLast  = step === STEPS.length - 1;
+  const isFirst = step === 0;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300 }}>
-      {/* Blocks interaction with the rest of the app while the tour is active.
-          Deliberately has no onClick -- an in-progress tour should only be
-          dismissed via Skip/Finish/Escape, not an accidental background click. */}
-      <div style={{ position: 'fixed', inset: 0 }} />
-
-      {/* Spotlight / backdrop (purely visual, sits above the blocker) */}
-      {rect ? (
-        <>
-          <div
-            style={{
-              position: 'fixed',
-              top: rect.top - SPOTLIGHT_PAD,
-              left: rect.left - SPOTLIGHT_PAD,
-              width: rect.width + SPOTLIGHT_PAD * 2,
-              height: rect.height + SPOTLIGHT_PAD * 2,
-              borderRadius: 12,
-              boxShadow: `0 0 0 9999px rgba(6,16,32,0.68), 0 0 0 2px ${hexToRgba(accent, 0.9)}`,
-              transition: 'top 0.4s cubic-bezier(.22,1,.36,1), left 0.4s cubic-bezier(.22,1,.36,1), width 0.4s, height 0.4s',
-              pointerEvents: 'none',
-            }}
-          />
-          {/* Soft pulsing glow ring to draw the eye to the target */}
-          <div
-            key={`pulse-${stepIndex}`}
-            style={{
-              position: 'fixed',
-              top: rect.top - SPOTLIGHT_PAD,
-              left: rect.left - SPOTLIGHT_PAD,
-              width: rect.width + SPOTLIGHT_PAD * 2,
-              height: rect.height + SPOTLIGHT_PAD * 2,
-              borderRadius: 12,
-              border: `2px solid ${accent}`,
-              pointerEvents: 'none',
-              animation: 'cleanair-pulse-ring 1.8s cubic-bezier(.4,0,.6,1) infinite',
-            }}
-          />
-        </>
-      ) : (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'radial-gradient(circle at 50% 42%, rgba(10,34,64,0.55), rgba(4,10,20,0.78))',
-          backdropFilter: 'blur(2px)',
-          transition: 'opacity 0.3s', pointerEvents: 'none',
-        }} />
-      )}
-
-      {/* Tooltip arrow */}
-      {rect && arrowLeft !== null && (
-        <div style={{
-          position: 'fixed',
-          top: placeAbove ? tooltipTop + 16 - ARROW_SIZE / 2 + 1 : tooltipTop - ARROW_SIZE / 2 + 1,
-          left: tooltipLeft + arrowLeft,
-          width: ARROW_SIZE, height: ARROW_SIZE,
-          background: T.card,
-          transform: 'rotate(45deg)',
-          borderRadius: 2,
-          boxShadow: placeAbove ? '4px 4px 6px rgba(0,0,0,0.06)' : '-2px -2px 4px rgba(0,0,0,0.04)',
-          transition: 'top 0.4s cubic-bezier(.22,1,.36,1), left 0.4s cubic-bezier(.22,1,.36,1)',
-        }} />
-      )}
-
-      {/* Tooltip card */}
+    <>
+      {/* Backdrop */}
       <div
-        key={stepIndex}
+        onClick={dismiss}
         style={{
-          position: 'fixed',
-          top: tooltipTop,
-          left: tooltipLeft,
-          width: TOOLTIP_WIDTH,
-          transform: rect ? 'none' : 'translateY(-50%)',
-          background: T.card, borderRadius: 14,
-          boxShadow: '0 24px 60px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.08)',
-          overflow: 'hidden',
-          fontFamily: "'DM Sans','Inter',sans-serif",
-          transition: 'top 0.4s cubic-bezier(.22,1,.36,1), left 0.4s cubic-bezier(.22,1,.36,1)',
-          animation: slideAnim,
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(10,34,64,0.55)',
+          backdropFilter: 'blur(3px)',
+          animation: 'fadeIn 0.2s ease',
         }}
-      >
-        {/* Gradient accent bar + progress */}
-        <div style={{ height: 4, background: T.border, position: 'relative' }}>
+      />
+
+      {/* Centered tooltip card */}
+      <div style={{
+        position: 'fixed', zIndex: 201,
+        top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 380, maxWidth: 'calc(100vw - 32px)',
+        background: T.card,
+        border: `1px solid ${T.border}`,
+        borderRadius: 10,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+        overflow: 'hidden',
+        animation: 'slideUp 0.25s ease',
+        fontFamily: "'DM Sans','Inter',sans-serif",
+      }}>
+        {/* Header bar */}
+        <div style={{
+          background: T.navy, padding: '1rem 1.25rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* CleanAir logo mark */}
+            <div style={{
+              width: 30, height: 30, borderRadius: 6,
+              background: 'rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 8C8 10 5.9 16.17 3.82 22.2"/>
+                <path d="M21 4a20 20 0 0 1-3 0c-3.41-.17-6.78-1-10-3 0 7 4 12 8 13"/>
+              </svg>
+            </div>
+            <span style={{ fontWeight: 700, color: 'white', fontSize: '0.9rem' }}>Platform Tour</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              padding: '0.15rem 0.6rem', borderRadius: 3,
+              background: 'rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: '0.72rem', fontWeight: 700,
+            }}>
+              {step + 1} / {STEPS.length}
+            </span>
+            <button onClick={dismiss} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'rgba(255,255,255,0.6)', fontSize: '1rem', lineHeight: 1,
+              padding: '2px 4px',
+            }}>
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ height: 3, background: T.border }}>
           <div style={{
-            position: 'absolute', inset: 0, width: `${progressPct}%`,
-            background: `linear-gradient(90deg, ${accent}, ${hexToRgba(accent, 0.6)})`,
-            transition: 'width 0.35s cubic-bezier(.22,1,.36,1)',
+            height: '100%',
+            width: `${((step + 1) / STEPS.length) * 100}%`,
+            background: T.navy,
+            transition: 'width 0.3s ease',
           }} />
         </div>
 
-        <div style={{ padding: '1.125rem 1.25rem 1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 4 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              background: hexToRgba(accent, 0.12), color: accent,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon size={19} strokeWidth={2.25} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: T.textPrimary, margin: 0 }}>{step.title}</p>
-                <span style={{
-                  fontSize: '0.6875rem', fontWeight: 700, color: T.textMuted,
-                  background: '#F5F7FA', border: `1px solid ${T.border}`,
-                  borderRadius: 20, padding: '0.1rem 0.5rem', flexShrink: 0, whiteSpace: 'nowrap',
-                }}>
-                  {stepIndex + 1} / {steps.length}
-                </span>
-              </div>
-              <p style={{ fontSize: '0.8125rem', color: T.textMuted, margin: '4px 0 0', lineHeight: 1.55 }}>{step.body}</p>
-            </div>
+        {/* Content */}
+        <div style={{ padding: '1.5rem 1.25rem 1.25rem' }}>
+          {/* Step icon */}
+          <div style={{
+            width: 44, height: 44, borderRadius: 8,
+            background: `${T.navy}0F`, color: T.navy,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: '0.875rem', fontSize: '1.375rem',
+          }}>
+            {['🌿','💨','📸','🗺️','⭐','🌱','🤖','💬'][step]}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {steps.map((_, i) => (
-                <span key={i} style={{
-                  width: i === stepIndex ? 18 : 6, height: 6, borderRadius: 3,
-                  background: i === stepIndex ? accent : T.border,
-                  transition: 'all 0.3s cubic-bezier(.22,1,.36,1)',
-                }} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button onClick={finish} style={ghostBtnStyle} title="Skip tour (Esc)">
-                <X size={13} /> Skip
+          <h2 style={{
+            fontWeight: 800, fontSize: '1.0625rem', color: T.textPrimary,
+            margin: '0 0 8px', letterSpacing: '-0.01em',
+          }}>
+            {current.title}
+          </h2>
+          <p style={{
+            fontSize: '0.875rem', color: T.textMuted,
+            lineHeight: 1.6, margin: 0,
+          }}>
+            {current.desc}
+          </p>
+        </div>
+
+        {/* Step dots */}
+        <div style={{
+          display: 'flex', justifyContent: 'center', gap: 5,
+          paddingBottom: '0.5rem',
+        }}>
+          {STEPS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setStep(i)}
+              style={{
+                width: i === step ? 20 : 7,
+                height: 7, borderRadius: 4, border: 'none',
+                background: i === step ? T.navy : T.border,
+                cursor: 'pointer', padding: 0,
+                transition: 'all 0.2s ease',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '0.875rem 1.25rem',
+          borderTop: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: '0.75rem',
+        }}>
+          <button
+            onClick={dismiss}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '0.8125rem', color: T.textMuted,
+              fontFamily: 'inherit', padding: '0.375rem 0',
+            }}
+          >
+            Skip tour
+          </button>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {!isFirst && (
+              <button onClick={prev} style={{
+                padding: '0.5rem 1rem',
+                border: `1.5px solid ${T.border}`, borderRadius: 4,
+                background: 'white', color: T.textPrimary,
+                fontWeight: 600, fontSize: '0.8125rem',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+                Back
               </button>
-              {stepIndex > 0 && (
-                <button onClick={prev} style={iconBtnStyle} title="Previous (←)">
-                  <ChevronLeft size={15} />
-                </button>
-              )}
-              <button
-                onClick={next}
-                style={{ ...primaryBtnStyle, background: accent }}
-                onMouseEnter={(e) => (e.currentTarget.style.filter = 'brightness(1.12)')}
-                onMouseLeave={(e) => (e.currentTarget.style.filter = 'none')}
-                title={stepIndex === steps.length - 1 ? 'Finish' : 'Next (→)'}
-              >
-                {stepIndex === steps.length - 1 ? (<><Check size={14} /> Finish</>) : (<>Next <ChevronRight size={14} /></>)}
-              </button>
-            </div>
+            )}
+            <button onClick={next} style={{
+              padding: '0.5rem 1.25rem',
+              border: 'none', borderRadius: 4,
+              background: T.navy, color: 'white',
+              fontWeight: 700, fontSize: '0.8125rem',
+              cursor: 'pointer', fontFamily: 'inherit',
+              minWidth: 90,
+            }}>
+              {isLast ? 'Go to Dashboard' : 'Next'}
+            </button>
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes cleanair-tour-in-right {
-          from { opacity: 0; transform: translateX(14px) scale(0.98); }
-          to   { opacity: 1; transform: translateX(0) scale(1); }
-        }
-        @keyframes cleanair-tour-in-left {
-          from { opacity: 0; transform: translateX(-14px) scale(0.98); }
-          to   { opacity: 1; transform: translateX(0) scale(1); }
-        }
-        @keyframes cleanair-tour-out {
-          from { opacity: 1; transform: scale(1); }
-          to   { opacity: 0; transform: scale(0.96); }
-        }
-        @keyframes cleanair-pulse-ring {
-          0%   { opacity: 0.9; transform: scale(1); }
-          70%  { opacity: 0; transform: scale(1.06); }
-          100% { opacity: 0; transform: scale(1.06); }
-        }
+        @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
+        @keyframes slideUp { from { opacity:0; transform:translate(-50%,-48%) } to { opacity:1; transform:translate(-50%,-50%) } }
       `}</style>
-    </div>
+    </>
   );
 }
-
-const ghostBtnStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 4,
-  border: 'none', background: 'transparent', color: T.textMuted,
-  fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: '0.4rem 0.5rem',
-  fontFamily: 'inherit', borderRadius: 5, transition: 'background 0.15s',
-};
-
-const iconBtnStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  border: `1.5px solid ${T.border}`, background: 'white', color: T.textPrimary,
-  cursor: 'pointer', padding: '0.35rem', borderRadius: 6, width: 28, height: 28,
-  fontFamily: 'inherit',
-};
-
-const primaryBtnStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 5,
-  border: 'none', color: 'white', borderRadius: 7,
-  fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer', padding: '0.45rem 0.95rem',
-  fontFamily: 'inherit', transition: 'filter 0.15s', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-};
