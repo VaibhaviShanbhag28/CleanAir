@@ -173,16 +173,10 @@ export interface User {
   role: UserRole;
   ward?: string;
   karmaScore?: number;
-  /** false until the role/Aadhaar onboarding wizard is completed */
+  /** false until the role onboarding step is completed */
   onboarded?: boolean;
-  verifiedName?: string;
-  aadhaarLast4?: string;
   municipalityId?: string;
   municipalityName?: string;
-  departmentId?: string;
-  departmentName?: string;
-  designation?: string;
-  employeeId?: string;
 }
 
 export interface Municipality {
@@ -196,11 +190,6 @@ export interface Municipality {
 
 export interface OnboardPayload {
   role: 'citizen' | 'authority' | 'admin';
-  aadhaarNumber: string;
-  fullName: string;
   ward?: string;
   municipalityId?: string;
-  departmentId?: string;
-  designation?: string;
-  employeeId?: string;
 }

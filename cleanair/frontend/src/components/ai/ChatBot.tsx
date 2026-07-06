@@ -101,6 +101,7 @@ export default function ChatBot() {
     <>
       {/* ── Floating trigger button ── */}
       <button
+        data-tour="chatbot"
         onClick={() => setOpen(o => !o)}
         title={open ? 'Close assistant' : 'Open AI Assistant'}
         style={{

@@ -51,3 +51,5 @@ export const useAppStore = create<AppState>((set) => ({
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   addReport: (r) => set((s) => ({ reports: [r, ...s.reports] })),
 }));
+
+if (import.meta.env.DEV) (window as unknown as { __store?: typeof useAppStore }).__store = useAppStore;

@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui';
 import Navbar from '@/components/layout/Navbar';
 import ChatBot from '@/components/ai/ChatBot';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import OnboardingTour from '@/components/onboarding/OnboardingTour';
 
 // Pages
 import Dashboard from '@/pages/Dashboard';
@@ -29,6 +30,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <ChatBot />
+      <OnboardingTour />
       <ToastProvider />
     </div>
   );

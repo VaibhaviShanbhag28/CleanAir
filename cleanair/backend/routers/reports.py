@@ -7,7 +7,7 @@ from typing import Optional
 from pydantic import BaseModel
 from models.schemas import ReportCreate, ReportUpdate, ResolveRequest
 from services import database, ai_service
-from deps import require_role
+from deps import current_user, require_role
 
 
 class AcknowledgeRequest(BaseModel):
@@ -24,6 +24,7 @@ async def list_reports(
     severity: Optional[str] = Query(None),
     time_filter: Optional[str] = Query("today"),
     limit: int = Query(100, le=500),
+    _user: dict = Depends(current_user),
 ):
     return await database.get_reports(
         status=status,
@@ -35,7 +36,7 @@ async def list_reports(
 
 
 @router.post("", status_code=201)
-async def create_report(data: ReportCreate):
+async def create_report(data: ReportCreate, _user: dict = Depends(current_user)):
     report_dict = data.model_dump()
 
     # -- Fake-report gate: block before touching Firestore ---------------------
@@ -58,7 +59,7 @@ async def create_report(data: ReportCreate):
 
 
 @router.get("/flagged")
-async def get_flagged_reports(limit: int = Query(50, le=200)):
+async def get_flagged_reports(limit: int = Query(50, le=200), _user: dict = Depends(municipal_only)):
     """
     Reports where validation.review_flag == True.
     Used by MunicipalPage 'Needs Review' tab.
@@ -67,12 +68,12 @@ async def get_flagged_reports(limit: int = Query(50, le=200)):
 
 
 @router.get("/heatmap")
-async def get_heatmap(time_filter: str = Query("today")):
+async def get_heatmap(time_filter: str = Query("today"), _user: dict = Depends(current_user)):
     return await database.get_heatmap_data(time_filter=time_filter)
 
 
 @router.get("/{report_id}")
-async def get_report(report_id: str):
+async def get_report(report_id: str, _user: dict = Depends(current_user)):
     report = await database.get_report(report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -112,6 +113,6 @@ async def acknowledge_report(report_id: str, body: AcknowledgeRequest = Acknowle
 
 
 @router.post("/{report_id}/upvote")
-async def upvote_report(report_id: str):
+async def upvote_report(report_id: str, _user: dict = Depends(current_user)):
     upvotes = await database.upvote_report(report_id)
     return {"upvotes": upvotes}

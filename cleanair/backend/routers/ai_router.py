@@ -3,13 +3,14 @@ backend/routers/ai_router.py
 All AI endpoints - Gemini Vision, chatbot, horoscope, tools, etc.
 """
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
 from services import ai_service
 from services.validation_service import validate_image_base64
 from config import settings
+from deps import current_user
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -68,7 +69,7 @@ class DiarySummaryRequest(BaseModel):
 # --- Endpoints ---------------------------------------------------------------
 
 @router.post("/analyze")
-async def analyze_image(body: AnalyzeRequest):
+async def analyze_image(body: AnalyzeRequest, _user: dict = Depends(current_user)):
     """AI pollution image analysis + fake detection in parallel."""
     try:
         ai_result, val_result = await asyncio.gather(
@@ -89,7 +90,7 @@ async def analyze_image(body: AnalyzeRequest):
 
 
 @router.post("/chat")
-async def chatbot(body: ChatRequest):
+async def chatbot(body: ChatRequest, _user: dict = Depends(current_user)):
     """Environmental AI chatbot powered by Gemini."""
     msgs = [{"role": m.role, "content": m.content} for m in body.messages]
     reply = await ai_service.generate_chatbot_reply(msgs, body.userLocation or "Bengaluru", body.context or "")
@@ -98,61 +99,61 @@ async def chatbot(body: ChatRequest):
 
 
 @router.post("/notice")
-async def generate_notice(body: NoticeRequest):
+async def generate_notice(body: NoticeRequest, _user: dict = Depends(current_user)):
     """Generate official BBMP notice/circular."""
     result = await ai_service.generate_notice(body.noticeType, body.topic, body.ward or "", body.details or "", body.language)
     return result
 
 
 @router.get("/horoscope")
-async def aqi_horoscope(aqi: int = 150):
+async def aqi_horoscope(aqi: int = 150, _user: dict = Depends(current_user)):
     """Daily AQI horoscope for Bengaluru."""
     return await ai_service.generate_horoscope(aqi)
 
 
 @router.get("/advisory")
-async def health_advisory(aqi: int, lat: float = 12.9716, lng: float = 77.5946):
+async def health_advisory(aqi: int, lat: float = 12.9716, lng: float = 77.5946, _user: dict = Depends(current_user)):
     """Get localised health advisory for a given AQI."""
     return await ai_service.generate_health_advisory(aqi, lat, lng)
 
 
 @router.post("/report")
-async def authority_report(report: dict):
+async def authority_report(report: dict, _user: dict = Depends(current_user)):
     """Generate formal authority report for a pollution case."""
     return await ai_service.generate_authority_report(report)
 
 
 @router.post("/cleanup/verify")
-async def cleanup_verify(body: CleanupVerifyRequest):
+async def cleanup_verify(body: CleanupVerifyRequest, _user: dict = Depends(current_user)):
     """Verify before/after cleanup photos with AI."""
     return await ai_service.verify_cleanup(body.beforeImageBase64, body.afterImageBase64)
 
 
 @router.post("/waste/classify")
-async def waste_classify(body: WasteClassifyRequest):
+async def waste_classify(body: WasteClassifyRequest, _user: dict = Depends(current_user)):
     """Classify household waste from image."""
     return await ai_service.classify_waste(body.imageBase64)
 
 
 @router.post("/carbon")
-async def carbon_footprint(body: CarbonRequest):
+async def carbon_footprint(body: CarbonRequest, _user: dict = Depends(current_user)):
     """Calculate personal carbon footprint."""
     return await ai_service.calculate_carbon(body.dict())
 
 
 @router.post("/diary/summary")
-async def diary_summary(body: DiarySummaryRequest):
+async def diary_summary(body: DiarySummaryRequest, _user: dict = Depends(current_user)):
     """Generate AI summary of eco-diary entries."""
     return await ai_service.generate_diary_summary(body.entries)
 
 
 @router.post("/insights")
-async def dashboard_insights(analytics: dict):
+async def dashboard_insights(analytics: dict, _user: dict = Depends(current_user)):
     """POST endpoint for AI dashboard insights (from dashboard AI summary button)."""
     return await ai_service.generate_dashboard_insights(analytics)
 
 
 @router.get("/seasonal/{month}")
-async def seasonal_forecast(month: int):
+async def seasonal_forecast(month: int, _user: dict = Depends(current_user)):
     """Seasonal pollution forecast for a given month (1-12)."""
     return await ai_service.seasonal_prediction(month)

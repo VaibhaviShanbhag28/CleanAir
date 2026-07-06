@@ -46,8 +46,6 @@ async def lifespan(app: FastAPI):
         print("--  GOOGLE_MAPS_KEY not set - map features limited")
     if settings.SECRET_KEY == "cleanair-secret-change-in-prod":
         print("!!  SECRET_KEY is still the placeholder default - set a real SECRET_KEY before deploying")
-    if settings.AADHAAR_SALT == "cleanair-aadhaar-salt-change-in-prod":
-        print("!!  AADHAAR_SALT is still the placeholder default - set a real AADHAAR_SALT before deploying")
     print("- CleanAir Platform v2 API ready at http://localhost:8000/api/docs")
     yield
     print("- CleanAir API shutting down")

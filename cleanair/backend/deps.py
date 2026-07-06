@@ -65,8 +65,17 @@ async def current_user(authorization: str = Header(default="")) -> dict:
 
 
 def require_role(*roles: str):
+    """Admin is always allowed, in addition to whatever roles are listed."""
+    allowed = set(roles) | {"admin"}
+
     async def dep(user: dict = Depends(current_user)) -> dict:
-        if user["role"] not in roles:
+        if user["role"] not in allowed:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
     return dep
+
+
+def require_self_or_admin(user: dict, target_uid: str) -> None:
+    """Raise 403 unless the caller IS target_uid or is an admin."""
+    if user["role"] != "admin" and user["uid"] != target_uid:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")

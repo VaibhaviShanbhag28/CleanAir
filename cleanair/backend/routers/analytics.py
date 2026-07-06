@@ -1,18 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from services import database
 from models.schemas import TokenVerifyRequest
+from deps import current_user
 
 analytics_router = APIRouter(prefix="/analytics", tags=["analytics"])
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @analytics_router.get("/overview")
-async def analytics_overview():
+async def analytics_overview(_user: dict = Depends(current_user)):
     return await database.get_analytics_overview()
 
 
 @analytics_router.get("/ward/{ward}")
-async def ward_analytics(ward: str):
+async def ward_analytics(ward: str, _user: dict = Depends(current_user)):
     all_reports = await database.get_reports(limit=1000)
     ward_reports = [r for r in all_reports if r.get("location", {}).get("ward", "").lower() == ward.lower()]
     total = len(ward_reports)
@@ -32,22 +33,17 @@ async def verify_token(req: TokenVerifyRequest):
     try:
         import firebase_admin.auth as fb_auth
         decoded = fb_auth.verify_id_token(req.id_token)
-        return {
-            "uid": decoded["uid"],
-            "email": decoded.get("email"),
-            "access_token": req.id_token,  # In production, generate a JWT
-        }
     except Exception:
-        # Return demo token for development
-        return {
-            "uid": "demo-user",
-            "email": "demo@cleanair.in",
-            "access_token": "demo-token",
-        }
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return {
+        "uid": decoded["uid"],
+        "email": decoded.get("email"),
+        "access_token": req.id_token,  # In production, generate a JWT
+    }
 
 
 @analytics_router.get("/ai-insights")
-async def analytics_ai_insights():
+async def analytics_ai_insights(_user: dict = Depends(current_user)):
     """GET endpoint for AI-powered analytics insights (called by frontend dashboard)."""
     from services import ai_service
     overview = await database.get_analytics_overview()
@@ -56,7 +52,7 @@ async def analytics_ai_insights():
 
 
 @analytics_router.get("/wards/ranking")
-async def wards_ranking():
+async def wards_ranking(_user: dict = Depends(current_user)):
     """Return wards ranked by report count."""
     overview = await database.get_analytics_overview()
     return overview.get("wardRankings", [])

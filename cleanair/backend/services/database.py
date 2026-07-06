@@ -770,11 +770,3 @@ async def upsert_user_profile(uid: str, data: Dict) -> Dict:
     _store["users"].append(record)
     _save_store()
     return record
-
-
-async def find_user_by_aadhaar(aadhaar_hash: str) -> Optional[Dict]:
-    if _firebase_available and _db:
-        q = _db.collection("users").where("aadhaarHash", "==", aadhaar_hash).limit(1)
-        docs = list(q.stream())
-        return docs[0].to_dict() if docs else None
-    return next((u for u in _store["users"] if u.get("aadhaarHash") == aadhaar_hash), None)

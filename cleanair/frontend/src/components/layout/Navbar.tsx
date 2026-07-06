@@ -16,14 +16,14 @@ const T = {
 };
 
 const NAV = [
-  { to: '/',          label: 'Dashboard'  },
-  { to: '/report',    label: 'Report'     },
-  { to: '/map',       label: 'Incidents'  },
-  { to: '/karma',     label: 'Karma'      },
-  { to: '/community', label: 'Community'  },
-  { to: '/diary',     label: 'Field Diary'},
-  { to: '/tools',     label: 'AI Tools'   },
-  { to: '/municipal', label: 'Municipal'  },
+  { to: '/',          label: 'Dashboard',   tour: 'nav-dashboard'  },
+  { to: '/report',    label: 'Report',      tour: 'nav-report'     },
+  { to: '/map',       label: 'Incidents',   tour: 'nav-map'        },
+  { to: '/karma',     label: 'Karma',       tour: 'nav-karma'      },
+  { to: '/community', label: 'Community',   tour: 'nav-community'  },
+  { to: '/diary',     label: 'Field Diary'                          },
+  { to: '/tools',     label: 'AI Tools',    tour: 'nav-tools'      },
+  { to: '/municipal', label: 'Municipal',   tour: 'nav-municipal'  },
 ];
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ export default function Navbar() {
           {NAV.map(n => {
             const active = location.pathname === n.to;
             return (
-              <Link key={n.to} to={n.to} style={{
+              <Link key={n.to} to={n.to} data-tour={n.tour} style={{
                 display: 'flex', alignItems: 'center',
                 padding: '0.4rem 0.75rem',
                 borderRadius: 4,

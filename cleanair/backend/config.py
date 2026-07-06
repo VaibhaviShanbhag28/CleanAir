@@ -36,7 +36,6 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: Optional[str] = None
 
     # Security
-    AADHAAR_SALT:               str = "cleanair-aadhaar-salt-change-in-prod"
     SECRET_KEY:                 str = "cleanair-secret-change-in-prod"
     ALGORITHM:                  str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
