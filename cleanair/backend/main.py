@@ -4,9 +4,12 @@ CleanAir Backend v2 - BBMP Bengaluru Environmental Platform
 import truststore
 truststore.inject_into_ssl()  # verify TLS via the OS cert store (fixes SSL_CERTIFICATE_VERIFY_FAILED behind corporate proxies/AV TLS inspection)
 
-from fastapi import FastAPI
+from pathlib import Path
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -89,9 +92,24 @@ async def health():
     }
 
 
-@app.get("/", tags=["system"])
-async def root():
-    return {"name": "CleanAir API", "version": "2.0.0", "docs": "/api/docs"}
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+if STATIC_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", tags=["system"])
+    async def spa(full_path: str):
+        """Serve the built frontend, falling back to index.html for client-side routes."""
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = STATIC_DIR / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(STATIC_DIR / "index.html")
+else:
+    @app.get("/", tags=["system"])
+    async def root():
+        return {"name": "CleanAir API", "version": "2.0.0", "docs": "/api/docs"}
 
 
 if __name__ == "__main__":
